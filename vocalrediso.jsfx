@@ -1,0 +1,251 @@
+// based on vocalrediso.ny, a built in nyquist filter for audacity: Released under terms of the GNU General Public License version 2
+// uses some code from https://github.com/Nbickford/REAPERDenoiser
+
+desc: vocal removal/isolation
+//tags: processing vocals stereo
+//author: Michael Pannekoek
+
+slider1:0<0,3,1{Do Nothing,Remove Vocals,Isolate Vocals,Isolate Vocals and Invert}>action
+slider2:1<0,50,0.1>strength
+slider3:120<0,24000>Low Cut (Vocals)
+slider4:9000<0,24000>High Cut (Vocals)
+slider5:0<-180,180,1>Rotation (Degrees)
+
+in_pin:left input
+in_pin:right input
+out_pin:left output
+out_pin:right output
+
+
+
+@slider
+// convert low cut and high cut to bins every time a slider is changed
+lowBin = floor(slider3 * srate / SIZE / 2.0);
+highBin = floor(slider4 * srate / SIZE / 2.0);
+// convert to radians
+rotation = slider5*$pi/180;
+// give a better name
+strength = slider2;
+
+
+
+@init
+// init variables
+// FFT - fft window size (will be constant)
+SIZE = 8192;
+// precalculated integral of window
+WIN_SIGMA = 0.5;
+
+// Left channel
+bufferL = SIZE*0;
+bufferI1L = SIZE*1;
+bufferI2L = SIZE*2;
+// Right channel
+bufferR = SIZE*3;
+bufferI1R = SIZE*4;
+bufferI2R = SIZE*5;
+ // power sum of mid channel (L+R)
+bufferPS1M = SIZE*6;
+bufferPS2M = SIZE*7;
+ // power sum of side channel (L_R)
+bufferPS1S = SIZE*8; // power sum of side channel
+bufferPS2S = SIZE*9;
+// Center
+bufferO1C = SIZE*10;
+bufferO2C = SIZE*11;
+// temporary buffer for storing fft input and result
+fftBuffer = SIZE*12;
+freembuf(SIZE*14 + 1);
+
+// samplesCollected tracks the position in the last of the two tiles
+// ranges from 0 to (SIZE/2)-1
+samplesCollected = 0;
+
+// tell reaper what delay this plugin will introduce,
+// so that it can be compensated for
+pdc_delay = SIZE;
+// delay is one full buffer
+pdc_bot_ch = 0; pdc_top_ch = 2;
+// which channels are delayed
+// (channel number must be greater than or equal to 0,
+// but less than 2, so 0 and 1 - LR output).
+
+
+
+@sample
+// calculate the power spectrum for a single frequency band
+function powerSpectrum(bReal, bImag)
+(
+	log(32/sqr(WIN_SIGMA)*(sqr(bReal)+sqr(bImag))); 
+);
+
+// input corrections:
+// rotate stereo field to isloate different phases
+direction = sign(rotation);
+cosine = cos(abs(rotation));
+sine = sin(abs(rotation));
+sampleLeft = spl0 * cosine - direction * sine * spl1;
+sampleRight = direction * sine * spl0 + cosine * spl1;
+// that's a lowercase L in spl, not the number 1.
+// spl0 corresponds to L, spl1 corresponds to R.
+
+// find positions in tile 1 and 2
+tilePos1 = samplesCollected + SIZE/2;
+tilePos2 = samplesCollected;
+
+// apply the hann envelope while writing the sample into the tile buffer
+// See https://en.wikipedia.org/wiki/Window_function#Hann_and_Hamming_windows
+hannWindowTile1 = 0.5 - 0.5 * cos(2*$pi*tilePos1/SIZE);
+hannWindowTile1 = 0.5 - 0.5 * cos(2*$pi*tilePos2/SIZE);
+
+// output audio, subtracting or outputting the center channel based on slider1
+// if slider1 is less than two, the Left channel is present in the output
+// if slider1 is equal to 2, then the center channel is present in the output,
+// otherwise it is subtracted
+outL = bufferL[tilePos1];
+outR = bufferR[tilePos1];
+outC = bufferO1C[tilePos1] + bufferO2C[tilePos2];
+spl0 = (slider1 < 2 ? outL) + (slider1 == 2 ? outC : (slider1 != 0 ? -outC));
+spl1 = (slider1 < 2 ? outR) + (slider1 == 2 ? outC : (slider1 != 0 ? -outC));
+// if x evaluates to 0, x ? y will return 0
+
+// write to buffers:
+// Left + Right input buffers
+bufferI1L[tilePos1] = sampleLeft * hannWindowTile1;
+bufferI2L[tilePos2] = sampleLeft * hannWindowTile2;
+bufferI1R[tilePos1] = sampleRight * hannWindowTile1;
+bufferI2R[tilePos2] = sampleRight * hannWindowTile2;
+
+// set original L & R buffers
+bufferL[samplesCollected] = sampleLeft;
+bufferR[samplesCollected] = sampleRight;
+
+samplesCollected += 1;
+
+// once we reach the end of a tile:
+samplesCollected == SIZE/2 ? (
+	samplesCollected = 0;
+	// wrap back to 0 on the tile
+	
+	// calculate fft for side channel (difference)
+	// Loop over each of the audio samples, from index = 0 to SIZE - 1.
+	index = 0;
+	loop(SIZE,
+		fftBuffer[2 * index + 0] = bufferI1L[index] - bufferI1R[index];
+		// Real part
+		fftBuffer[2 * index + 1] = 0.0;
+		// Imaginary part
+		index += 1;
+		// Next index
+	);
+	// calculate fft in place 
+	fft(fftBuffer, SIZE);
+	// need to permute the frequency bins to get them in the right order
+	// See https://www.reaper.fm/sdk/js/advfunc.php#js_advanced for more info.
+	fft_permute(fftBuffer, SIZE);
+	
+	bandIndex = 0;
+	loop(SIZE,
+		bufferPS1S[bandIndex] = powerSpectrum(
+			fftBuffer[2 * bandIndex + 0],
+			fftBuffer[2 * bandIndex + 1]
+		);
+		bandIndex += 1;
+	);
+	
+	// calculate fft for mid channel (sum)
+	// This will overwrite the fft for the side
+	// located in fftBuffer, which is no longer needed.
+	// loop over each of the audio samples, from index = 0 to SIZE - 1.
+	index = 0;
+	loop(SIZE,
+		fftBuffer[2 * index + 0] = bufferI1L[index] + bufferI1R[index];
+		// Real part
+		fftBuffer[2 * index + 1] = 0.0;
+		// Imaginary part
+		index += 1;
+		// Next index
+	);
+	// calculate fft in place 
+	fft(fftBuffer, SIZE);
+	// need to permute the frequency bins to get them in the right order
+	// See https://www.reaper.fm/sdk/js/advfunc.php#js_advanced for more info.
+	fft_permute(fftBuffer, SIZE);
+	
+	bandIndex = 0;
+	loop(SIZE,
+		bufferPS1M[bandIndex] = powerSpectrum(
+			fftBuffer[2 * bandIndex + 0],
+			fftBuffer[2 * bandIndex + 1]
+		);		
+		bandIndex += 1;
+	);
+	
+	
+	// Compute center channel:
+	// Make a weighted center (mono)
+	// that can be substracted from L&R
+	// we start off with the fft of the mid channel in the fftBuffer
+	bandIndex = 0;
+	loop(SIZE,
+		wt_exp = exp(strength * (bufferPS1S[bandIndex] - bufferPS1M[bandIndex]));
+		// the following code may or may not be correct.
+		// I've made a few assumptions when porting it,
+		// This version calulates things more directly.
+		// If I've understood the code right it should have the same effect
+		weight = max(wt_exp, 0);
+		weight = min(weight, 1);
+		weight = 0.5-weight*2;
+		// explanation:
+		// linear mapping of 0 to 0.5 and 1 to -0.5
+		// based on the following nyquist in vocalrediso.ny:
+		// (setf *map* (snd-pwl 0 10000 (list 0 0.5 10000 0.0 20000 -0.5 20001)))
+		// (shape wt-exp *map* 0)
+		
+		// if this frequency bin is within the appropriate range,
+		// then process it, otherwise zero it out
+		fftBuffer[bandIndex * 2 + 0] = (bandIndex >= lowBin ?
+			(bandIndex < highBin ? wieght * fftBuffer[bandIndex * 2 + 0])
+		);
+		fftBuffer[bandIndex * 2 + 1] = (bandIndex >= lowBin ?
+			(bandIndex < highBin ? wieght * fftBuffer[bandIndex * 2 + 1])
+		);
+		// y ? z returns 0 by default when y = 0 (false), so 0 is not stated explicitly
+		bandIndex += 1;
+	);
+	
+	// apply ifft to calculate center channel, which should now be present in fftBuffer
+	fft_ipermute(fftBuffer, SIZE);
+	ifft(fftBuffer, SIZE);
+	
+	// Copy from the complex numbers in fftBuffer to the center tile:
+	index = 0;
+	loop(SIZE,
+		bufferO1C[index] = fftBuffer[2 * index + 0];
+		index += 1;
+	);
+	
+	// swap tiles
+	temp = bufferI1L;
+	bufferI1L = bufferI2L;
+	bufferI2L = temp;
+	
+	temp = bufferI1R;
+	bufferI1R = bufferI2R;
+	bufferI2R = temp;
+	
+	temp = bufferPS1M;
+	bufferPS1M = bufferPS2M;
+	bufferPS2M = temp;
+	
+	temp = bufferPS1S;
+	bufferPS1S = bufferPS2S;
+	bufferPS2S = temp;
+	
+	temp = bufferO1C;
+	bufferO1C = bufferO2C;
+	bufferO2C = temp;
+)
+
+// sliders are serialized automatically
+// thus nothing to serialize, as nothing else makes sense to store
