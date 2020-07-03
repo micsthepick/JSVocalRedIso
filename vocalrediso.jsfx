@@ -41,7 +41,7 @@ bufferL = SIZE*0;
 bufferI1L = SIZE*1;
 bufferI2L = SIZE*2;
 // Right channel
-bufferR = SIZE*3;
+buffer1R = SIZE*3;
 bufferI1R = SIZE*4;
 bufferI2R = SIZE*5;
  // power sum of mid channel (L+R)
@@ -60,6 +60,8 @@ freembuf(SIZE*14 + 1);
 // samplesCollected tracks the position in the last of the two tiles
 // ranges from 0 to (SIZE/2)-1
 samplesCollected = 0;
+// offset ranges from 0 to SIZE-1
+offset = 0;
 
 // tell reaper what delay this plugin will introduce,
 // so that it can be compensated for
@@ -102,8 +104,8 @@ hannWindowTile1 = 0.5 - 0.5 * cos(2*$pi*tilePos2/SIZE);
 // if slider1 is less than two, the Left channel is present in the output
 // if slider1 is equal to 2, then the center channel is present in the output,
 // otherwise it is subtracted
-outL = bufferL[tilePos1];
-outR = bufferR[tilePos1];
+outL = bufferL[tilePos1 + offset];
+outR = bufferR[samplesCollected];
 outC = bufferO1C[tilePos1] + bufferO2C[tilePos2];
 spl0 = (slider1 < 2 ? outL) + (slider1 == 2 ? outC : (slider1 != 0 ? -outC));
 spl1 = (slider1 < 2 ? outR) + (slider1 == 2 ? outC : (slider1 != 0 ? -outC));
@@ -121,6 +123,11 @@ bufferL[samplesCollected] = sampleLeft;
 bufferR[samplesCollected] = sampleRight;
 
 samplesCollected += 1;
+offset += 1;
+
+offset == SIZE/2 ? (
+	offset = 0;
+);
 
 // once we reach the end of a tile:
 samplesCollected == SIZE/2 ? (
@@ -177,7 +184,7 @@ samplesCollected == SIZE/2 ? (
 		bufferPS1M[bandIndex] = powerSpectrum(
 			fftBuffer[2 * bandIndex + 0],
 			fftBuffer[2 * bandIndex + 1]
-		);		
+		);          
 		bandIndex += 1;
 	);
 	
@@ -226,6 +233,9 @@ samplesCollected == SIZE/2 ? (
 	);
 	
 	// swap tiles
+	offset = offset == 0 ? SIZE/2;
+	// set offset to SIZE/2 if 0, otherwise 0
+	
 	temp = bufferI1L;
 	bufferI1L = bufferI2L;
 	bufferI2L = temp;
