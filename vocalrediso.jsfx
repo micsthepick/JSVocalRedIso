@@ -6,7 +6,7 @@ desc: vocal removal/isolation
 //author: Michael Pannekoek
 
 slider1:0<0,3,1{Do Nothing,Remove Vocals,Isolate Vocals,Isolate Vocals and Invert}>action
-slider2:1<0,50,0.1>strength
+slider2:1<0.1,50,0.1>strength
 slider3:120<0,24000>Low Cut (Vocals)
 slider4:9000<0,24000>High Cut (Vocals)
 slider5:0<-180,180,1>Rotation (Degrees)
@@ -20,8 +20,8 @@ out_pin:right output
 
 @slider
 // convert low cut and high cut to bins every time a slider is changed
-lowBin = floor(slider3 * srate / SIZE / 2.0);
-highBin = floor(slider4 * srate / SIZE / 2.0);
+lowBin = slider3 / srate * SIZE;
+highBin = slider4 / srate * SIZE;
 // convert to radians
 rotation = slider5*$pi/180;
 // give a better name
@@ -33,15 +33,18 @@ strength = slider2;
 // init variables
 // FFT - fft window size (will be constant)
 SIZE = 8192;
-// precalculated integral of window
-WIN_SIGMA = 0.5;
+// precalculated max value of integral of window
+// times frame size (add all samples together
+// then multiply by the fraction of the frame size over
+// the samplerate)
+WIN_SIGMA = 0.5*sqr(SIZE)/srate;
 
 // Left channel
 bufferL = SIZE*0;
 bufferI1L = SIZE*1;
 bufferI2L = SIZE*2;
 // Right channel
-buffer1R = SIZE*3;
+bufferR = SIZE*3;
 bufferI1R = SIZE*4;
 bufferI2R = SIZE*5;
  // power sum of mid channel (L+R)
@@ -76,18 +79,17 @@ pdc_bot_ch = 0; pdc_top_ch = 2;
 
 @sample
 // calculate the power spectrum for a single frequency band
-function powerSpectrum(bReal, bImag)
+function powerSpectrum(bReal bImag)
 (
-	log(32/sqr(WIN_SIGMA)*(sqr(bReal)+sqr(bImag))); 
+	log(16/sqr(WIN_SIGMA)*(sqr(bReal)+sqr(bImag))); 
 );
 
 // input corrections:
 // rotate stereo field to isloate different phases
-direction = sign(rotation);
-cosine = cos(abs(rotation));
-sine = sin(abs(rotation));
-sampleLeft = spl0 * cosine - direction * sine * spl1;
-sampleRight = direction * sine * spl0 + cosine * spl1;
+cosine = cos(rotation);
+sine = sin(rotation);
+sampleLeft = cosine * spl0 - sine * spl1;
+sampleRight = sine * spl0 + cosine * spl1;
 // that's a lowercase L in spl, not the number 1.
 // spl0 corresponds to L, spl1 corresponds to R.
 
@@ -98,17 +100,20 @@ tilePos2 = samplesCollected;
 // apply the hann envelope while writing the sample into the tile buffer
 // See https://en.wikipedia.org/wiki/Window_function#Hann_and_Hamming_windows
 hannWindowTile1 = 0.5 - 0.5 * cos(2*$pi*tilePos1/SIZE);
-hannWindowTile1 = 0.5 - 0.5 * cos(2*$pi*tilePos2/SIZE);
+hannWindowTile2 = 0.5 - 0.5 * cos(2*$pi*tilePos2/SIZE);
 
 // output audio, subtracting or outputting the center channel based on slider1
 // if slider1 is less than two, the Left channel is present in the output
 // if slider1 is equal to 2, then the center channel is present in the output,
 // otherwise it is subtracted
-outL = bufferL[tilePos1 + offset];
-outR = bufferR[samplesCollected];
+outL = bufferL[offset];
+outR = bufferR[offset];
 outC = bufferO1C[tilePos1] + bufferO2C[tilePos2];
-spl0 = (slider1 < 2 ? outL) + (slider1 == 2 ? outC : (slider1 != 0 ? -outC));
-spl1 = (slider1 < 2 ? outR) + (slider1 == 2 ? outC : (slider1 != 0 ? -outC));
+centrePart = (slider1 == 2 ? outC : (slider1 != 0 ? -outC));
+leftPart = (slider1 < 2 ? outL);
+rightPart = (slider1 < 2 ? outR);
+spl0 = leftPart + centrePart;
+spl1 = rightPart + centrePart;
 // if x evaluates to 0, x ? y will return 0
 
 // write to buffers:
@@ -119,13 +124,14 @@ bufferI1R[tilePos1] = sampleRight * hannWindowTile1;
 bufferI2R[tilePos2] = sampleRight * hannWindowTile2;
 
 // set original L & R buffers
-bufferL[samplesCollected] = sampleLeft;
-bufferR[samplesCollected] = sampleRight;
+bufferL[offset] = sampleLeft;
+bufferR[offset] = sampleRight;
 
-samplesCollected += 1;
+// increment positions
 offset += 1;
+samplesCollected += 1;
 
-offset == SIZE/2 ? (
+offset == SIZE ? (
 	offset = 0;
 );
 
@@ -145,7 +151,9 @@ samplesCollected == SIZE/2 ? (
 		index += 1;
 		// Next index
 	);
-	// calculate fft in place 
+	// calculate fft in place
+	// size specifies the number of bins
+	// (one complex number for each bin)
 	fft(fftBuffer, SIZE);
 	// need to permute the frequency bins to get them in the right order
 	// See https://www.reaper.fm/sdk/js/advfunc.php#js_advanced for more info.
@@ -200,24 +208,27 @@ samplesCollected == SIZE/2 ? (
 		// I've made a few assumptions when porting it,
 		// This version calulates things more directly.
 		// If I've understood the code right it should have the same effect
-		weight = max(wt_exp, 0);
-		weight = min(weight, 1);
-		weight = 0.5-weight*2;
+		wt_exp = min(wt_exp, 1);
+		weight = 0.5-0.5*wt_exp;
 		// explanation:
-		// linear mapping of 0 to 0.5 and 1 to -0.5
+		// linear mapping of 0 to 0.5 and 1 to 0
+		// (and everything below 0 to 0.5, and above to 0)
 		// based on the following nyquist in vocalrediso.ny:
 		// (setf *map* (snd-pwl 0 10000 (list 0 0.5 10000 0.0 20000 -0.5 20001)))
 		// (shape wt-exp *map* 0)
 		
 		// if this frequency bin is within the appropriate range,
 		// then process it, otherwise zero it out
-		fftBuffer[bandIndex * 2 + 0] = (bandIndex >= lowBin ?
-			(bandIndex < highBin ? wieght * fftBuffer[bandIndex * 2 + 0])
+		(
+			bandIndex >= lowBin && bandIndex < highBin ?
+			(
+				fftBuffer[bandIndex * 2 + 0] *= weight / SIZE;
+				fftBuffer[bandIndex * 2 + 1] *= weight / SIZE;
+			) : (
+				fftBuffer[bandIndex * 2 + 0] = 0;
+				fftBuffer[bandIndex * 2 + 1] = 0;
+			)
 		);
-		fftBuffer[bandIndex * 2 + 1] = (bandIndex >= lowBin ?
-			(bandIndex < highBin ? wieght * fftBuffer[bandIndex * 2 + 1])
-		);
-		// y ? z returns 0 by default when y = 0 (false), so 0 is not stated explicitly
 		bandIndex += 1;
 	);
 	
