@@ -16,11 +16,15 @@ After it installs, copy vocalrediso.jsfx to somewhere in `...\ReaPlugs\JS` at th
 
 ## Using the effect:
 
-- Vocal Reduction (Karaoke)
+- Vocal Reduction (Karaoke)  
 set dry mix to 100%, and centre mix to -100% (subtract the center from the mix), and adjust the Low Cut untill drums/bass
 instruments are still audible enough, without hearing too much vocals,
 and adjust the high cut so that it is high enough that the vocals don't bleed through
 
-- Vocal Isolation (Acapella)
+- Vocal Isolation (Acapella)  
 set dry mix to 0%, and centre mix to -100% or 100%.  
 (-100% can be used to make a seperate duplicate track that can be faded to blend between different modes).
+
+### A word of caution
+some tracks are mixed in such a way that the results from this plugin will not be so sucessful.  
+In that case it is best to go find a pre mixed version. You might get away with making an acapella version by aligning and subtracting an instrumental version with the original mix, or vice versa if you have the wrong version.
