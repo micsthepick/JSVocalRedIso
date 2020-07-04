@@ -1,0 +1,26 @@
+# JSVocalRedIso
+This is a JSFX (JesuSonic Effect) that Implements the main algorithm in Audacity's VocalRedIso.ny, in realtime.  
+It can isolate or attenuate the vocals (center panned audio) in a mix, and as such this effect works on stereo tracks only.
+
+## Loading the effect:
+
+### Reaper
+Reaper supports JSFX natively, just copy vocalrediso.jsfx to `%AppData%\REAPER\Effects` (In a subfolder if preferred)
+
+### VST compatible DAW
+JSFX can usually be run in a vst through [ReaPlugs by Cocos](https://www.reaper.fm/reaplugs/).  
+Download and install ReaPlugs, and pay attention to where it installs.  
+After it installs, copy vocalrediso.jsfx to somewhere in `...\ReaPlugs\JS` at the install location  
+(My install is located at `C:\Program Files\VSTPlugins\ReaPlugs\JS`)
+
+
+## Using the effect:
+
+- Vocal Reduction (Karaoke)
+set dry mix to 100%, and centre mix to -100% (subtract the center from the mix), and adjust the Low Cut untill drums/bass
+instruments are still audible enough, without hearing too much vocals,
+and adjust the high cut so that it is high enough that the vocals don't bleed through
+
+- Vocal Isolation (Acapella)
+set dry mix to 0%, and centre mix to -100% or 100%.  
+(-100% can be used to make a seperate duplicate track that can be faded to blend between different modes).
