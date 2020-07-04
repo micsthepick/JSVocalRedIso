@@ -5,11 +5,12 @@ desc: vocal removal/isolation
 //tags: processing vocals stereo
 //author: Michael Pannekoek
 
-slider1:0<0,3,1{Do Nothing,Remove Vocals,Isolate Vocals,Isolate Vocals and Invert}>action
-slider2:1<0.1,50,0.1>strength
-slider3:120<0,24000>Low Cut (Vocals)
-slider4:9000<0,24000>High Cut (Vocals)
-slider5:0<-180,180,1>Rotation (Degrees)
+slider1:100<-100,100,0.1>dry mix
+slider2:-100<-100,100,0.1>C mix 
+slider3:1<0.1,50,0.1>strength
+slider4:120<0,24000>Low Cut (Vocals)
+slider5:9000<0,24000>High Cut (Vocals)
+slider6:0<-180,180,1>Rotation (Degrees)
 
 in_pin:left input
 in_pin:right input
@@ -20,18 +21,21 @@ out_pin:right output
 
 @slider
 // convert low cut and high cut to bins every time a slider is changed
-lowBin = slider3 / srate * SIZE;
-highBin = slider4 / srate * SIZE;
+lowBin = slider4 / srate * SIZE;
+highBin = slider5 / srate * SIZE;
 // convert to radians
-rotation = slider5*$pi/180;
+rotation = slider6*$pi/180;
 // give a better name
-strength = slider2;
+strength = slider3;
+// convert to decimal
+dryMix = slider1/100;
+centreMix = slider2/100;
 
 
 
 @init
-lowBin = slider3 / srate * SIZE;
-highBin = slider4 / srate * SIZE;
+lowBin = slider4 / srate * SIZE;
+highBin = slider5 / srate * SIZE;
 // init variables
 // FFT - fft window size (will be constant)
 SIZE = 8192;
@@ -113,9 +117,9 @@ hannWindowTile2 = 1 - hannWindowTile1;
 outL = bufferL[offset];
 outR = bufferR[offset];
 outC = bufferO1C[tilePos1] + bufferO2C[tilePos2];
-centrePart = (slider1 == 2 ? outC : (slider1 != 0 ? -outC));
-leftPart = (slider1 < 2 ? outL);
-rightPart = (slider1 < 2 ? outR);
+centrePart = outC * centreMix;
+leftPart = outL * dryMix;
+rightPart = outR * dryMix;
 spl0 = leftPart + centrePart;
 spl1 = rightPart + centrePart;
 // if x evaluates to 0, x ? y will return 0
@@ -272,3 +276,4 @@ samplesCollected == SIZE/2 ? (
 
 // sliders are serialized automatically
 // thus nothing to serialize, as nothing else makes sense to store
+
