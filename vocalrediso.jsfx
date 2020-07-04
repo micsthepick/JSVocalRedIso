@@ -30,6 +30,8 @@ strength = slider2;
 
 
 @init
+lowBin = slider3 / srate * SIZE;
+highBin = slider4 / srate * SIZE;
 // init variables
 // FFT - fft window size (will be constant)
 SIZE = 8192;
@@ -100,7 +102,9 @@ tilePos2 = samplesCollected;
 // apply the hann envelope while writing the sample into the tile buffer
 // See https://en.wikipedia.org/wiki/Window_function#Hann_and_Hamming_windows
 hannWindowTile1 = 0.5 - 0.5 * cos(2*$pi*tilePos1/SIZE);
-hannWindowTile2 = 0.5 - 0.5 * cos(2*$pi*tilePos2/SIZE);
+hannWindowTile2 = 1 - hannWindowTile1;
+// hannWindowTile2 has a relationship to the other window tile, so
+// it is epressed in this way for accuracy and speed
 
 // output audio, subtracting or outputting the center channel based on slider1
 // if slider1 is less than two, the Left channel is present in the output
@@ -144,7 +148,9 @@ samplesCollected == SIZE/2 ? (
 	// Loop over each of the audio samples, from index = 0 to SIZE - 1.
 	index = 0;
 	loop(SIZE,
-		fftBuffer[2 * index + 0] = bufferI1L[index] - bufferI1R[index];
+		diff = bufferI1L[index] - bufferI1R[index];
+		fftBuffer[2 * index + 0] = diff;
+		
 		// Real part
 		fftBuffer[2 * index + 1] = 0.0;
 		// Imaginary part
@@ -174,7 +180,8 @@ samplesCollected == SIZE/2 ? (
 	// loop over each of the audio samples, from index = 0 to SIZE - 1.
 	index = 0;
 	loop(SIZE,
-		fftBuffer[2 * index + 0] = bufferI1L[index] + bufferI1R[index];
+		sum = bufferI1L[index] + bufferI1R[index];
+		fftBuffer[2 * index + 0] = sum;
 		// Real part
 		fftBuffer[2 * index + 1] = 0.0;
 		// Imaginary part
@@ -205,17 +212,16 @@ samplesCollected == SIZE/2 ? (
 	loop(SIZE,
 		wt_exp = exp(strength * (bufferPS1S[bandIndex] - bufferPS1M[bandIndex]));
 		// the following code may or may not be correct.
-		// I've made a few assumptions when porting it,
-		// This version calulates things more directly.
-		// If I've understood the code right it should have the same effect
+		// This version calulates things directly to how it's done in the plugin
 		wt_exp = min(wt_exp, 1);
-		weight = 0.5-0.5*wt_exp;
+		weight = 1-wt_exp;
 		// explanation:
-		// linear mapping of 0 to 0.5 and 1 to 0
-		// (and everything below 0 to 0.5, and above to 0)
 		// based on the following nyquist in vocalrediso.ny:
 		// (setf *map* (snd-pwl 0 10000 (list 0 0.5 10000 0.0 20000 -0.5 20001)))
 		// (shape wt-exp *map* 0)
+		// which appears to be a linear mapping of 0 to 0.5 and 1 to 0
+		// (and everything below 0 to 0.5, and above to 0)
+		// however I've found that's off by a factor of 2 (~6db)
 		
 		// if this frequency bin is within the appropriate range,
 		// then process it, otherwise zero it out
@@ -242,10 +248,6 @@ samplesCollected == SIZE/2 ? (
 		bufferO1C[index] = fftBuffer[2 * index + 0];
 		index += 1;
 	);
-	
-	// swap tiles
-	offset = offset == 0 ? SIZE/2;
-	// set offset to SIZE/2 if 0, otherwise 0
 	
 	temp = bufferI1L;
 	bufferI1L = bufferI2L;
