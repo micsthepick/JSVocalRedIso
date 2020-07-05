@@ -27,23 +27,19 @@ highBin = slider5 / srate * SIZE;
 rotation = slider6*$pi/180;
 // give a better name
 strength = slider3;
-// convert to decimal
+// convert percentage to raw scale factor
 dryMix = slider1/100;
 centreMix = slider2/100;
 
 
 
 @init
+// convert frequency sliders to fft bin indexes
 lowBin = slider4 / srate * SIZE;
 highBin = slider5 / srate * SIZE;
 // init variables
 // FFT - fft window size (will be constant)
 SIZE = 8192;
-// precalculated max value of integral of window
-// times frame size (add all samples together
-// then multiply by the fraction of the frame size over
-// the samplerate)
-WIN_SIGMA = 0.5*sqr(SIZE)/srate;
 
 // Left channel
 bufferL = SIZE*0;
@@ -53,12 +49,12 @@ bufferI2L = SIZE*2;
 bufferR = SIZE*3;
 bufferI1R = SIZE*4;
 bufferI2R = SIZE*5;
- // power sum of mid channel (L+R)
-bufferPS1M = SIZE*6;
-bufferPS2M = SIZE*7;
- // power sum of side channel (L_R)
-bufferPS1S = SIZE*8; // power sum of side channel
-bufferPS2S = SIZE*9;
+ // square norm of mid channel fft (L+R)
+bufferN1M = SIZE*6;
+bufferN2M = SIZE*7;
+ // square norm of side channel fft (L_R)
+bufferN1S = SIZE*8; // power sum of side channel
+bufferN2S = SIZE*9;
 // Center
 bufferO1C = SIZE*10;
 bufferO2C = SIZE*11;
@@ -84,10 +80,10 @@ pdc_bot_ch = 0; pdc_top_ch = 2;
 
 
 @sample
-// calculate the power spectrum for a single frequency band
-function powerSpectrum(bReal bImag)
+// calculate the square of the norm for a single frequency band
+function normSquared(bReal bImag)
 (
-	log(16/sqr(WIN_SIGMA)*(sqr(bReal)+sqr(bImag))); 
+	(sqr(bReal)+sqr(bImag)); 
 );
 
 // input corrections:
@@ -154,7 +150,6 @@ samplesCollected == SIZE/2 ? (
 	loop(SIZE,
 		diff = bufferI1L[index] - bufferI1R[index];
 		fftBuffer[2 * index + 0] = diff;
-		
 		// Real part
 		fftBuffer[2 * index + 1] = 0.0;
 		// Imaginary part
@@ -171,7 +166,7 @@ samplesCollected == SIZE/2 ? (
 	
 	bandIndex = 0;
 	loop(SIZE,
-		bufferPS1S[bandIndex] = powerSpectrum(
+		bufferN1S[bandIndex] = normSquared(
 			fftBuffer[2 * bandIndex + 0],
 			fftBuffer[2 * bandIndex + 1]
 		);
@@ -200,10 +195,10 @@ samplesCollected == SIZE/2 ? (
 	
 	bandIndex = 0;
 	loop(SIZE,
-		bufferPS1M[bandIndex] = powerSpectrum(
+		bufferN1M[bandIndex] = normSquared(
 			fftBuffer[2 * bandIndex + 0],
 			fftBuffer[2 * bandIndex + 1]
-		);          
+		);
 		bandIndex += 1;
 	);
 	
@@ -214,7 +209,8 @@ samplesCollected == SIZE/2 ? (
 	// we start off with the fft of the mid channel in the fftBuffer
 	bandIndex = 0;
 	loop(SIZE,
-		wt_exp = exp(strength * (bufferPS1S[bandIndex] - bufferPS1M[bandIndex]));
+		// equivalent to (bufferN1S[...] / bufferN1M[...]) ^ strength (assuming no error)
+		wt_exp = exp(strength * log(bufferN1S[bandIndex] / bufferN1M[bandIndex]));
 		// the following code may or may not be correct.
 		// This version calulates things directly to how it's done in the plugin
 		wt_exp = min(wt_exp, 1);
@@ -261,13 +257,13 @@ samplesCollected == SIZE/2 ? (
 	bufferI1R = bufferI2R;
 	bufferI2R = temp;
 	
-	temp = bufferPS1M;
-	bufferPS1M = bufferPS2M;
-	bufferPS2M = temp;
+	temp = bufferN1M;
+	bufferN1M = bufferN2M;
+	bufferN2M = temp;
 	
-	temp = bufferPS1S;
-	bufferPS1S = bufferPS2S;
-	bufferPS2S = temp;
+	temp = bufferN1S;
+	bufferN1S = bufferN2S;
+	bufferN2S = temp;
 	
 	temp = bufferO1C;
 	bufferO1C = bufferO2C;
