@@ -7,10 +7,11 @@ desc: vocal removal/isolation
 
 slider1:100<-100,100,0.1>dry mix
 slider2:-100<-100,100,0.1>C mix 
-slider3:1<0.1,50,0.1>strength
-slider4:120<0,24000>Low Cut (Vocals)
-slider5:9000<0,24000>High Cut (Vocals)
-slider6:0<-180,180,1>Rotation (Degrees)
+slider3:1<0.1,50,0.1>strength at Low Cut
+slider4:1<0.1,50,0.1>strength at High Cut
+slider5:120<0,24000>Low Cut (Vocals)
+slider6:9000<0,24000>High Cut (Vocals)
+slider7:0<-90,90,1>Phase (Degrees)
 
 in_pin:left input
 in_pin:right input
@@ -21,12 +22,10 @@ out_pin:right output
 
 @slider
 // convert low cut and high cut to bins every time a slider is changed
-lowBin = slider4 / srate * SIZE;
-highBin = slider5 / srate * SIZE;
+lowBin = min(slider5, slider6) / srate * SIZE;
+highBin = max(slider6, slider5) / srate * SIZE;
 // convert to radians
-rotation = slider6*$pi/180;
-// give a better name
-strength = slider3;
+rotation = slider7*$pi/180;
 // convert percentage to raw scale factor
 dryMix = slider1/100;
 centreMix = slider2/100;
@@ -34,12 +33,12 @@ centreMix = slider2/100;
 
 
 @init
-// convert frequency sliders to fft bin indexes
-lowBin = slider4 / srate * SIZE;
-highBin = slider5 / srate * SIZE;
 // init variables
 // FFT - fft window size (will be constant)
 SIZE = 8192;
+// track how many half frames of delay from the start we are
+// to mute the first inital buffers
+silence = 2;
 
 // Left channel
 bufferL = SIZE*0;
@@ -106,18 +105,24 @@ hannWindowTile2 = 1 - hannWindowTile1;
 // hannWindowTile2 has a relationship to the other window tile, so
 // it is epressed in this way for accuracy and speed
 
-// output audio, subtracting or outputting the center channel based on slider1
+// subtract or output the center channel from L and R based on slider1
 // if slider1 is less than two, the Left channel is present in the output
 // if slider1 is equal to 2, then the center channel is present in the output,
 // otherwise it is subtracted
-outL = bufferL[offset];
-outR = bufferR[offset];
+inL = bufferL[offset];
+inR = bufferR[offset];
 outC = bufferO1C[tilePos1] + bufferO2C[tilePos2];
 centrePart = outC * centreMix;
-leftPart = outL * dryMix;
-rightPart = outR * dryMix;
-spl0 = leftPart + centrePart;
-spl1 = rightPart + centrePart;
+leftPart = inL * dryMix;
+rightPart = inR * dryMix;
+outL = leftPart + centrePart;
+outR = rightPart + centrePart;
+
+// output audio, undoing rotation
+silence == 0 ? (
+	spl0 = outL * cosine + outR * sine;
+	spl1 = outR * cosine - outL * sine;
+) : spl0 = spl1 = 0;
 // if x evaluates to 0, x ? y will return 0
 
 // write to buffers:
@@ -141,6 +146,8 @@ offset == SIZE ? (
 
 // once we reach the end of a tile:
 samplesCollected == SIZE/2 ? (
+	// make silence go to 0
+	silence > 0 ? silence -= 1;
 	samplesCollected = 0;
 	// wrap back to 0 on the tile
 	
@@ -209,32 +216,37 @@ samplesCollected == SIZE/2 ? (
 	// we start off with the fft of the mid channel in the fftBuffer
 	bandIndex = 0;
 	loop(SIZE,
-		// equivalent to (bufferN1S[...] / bufferN1M[...]) ^ strength (assuming no error)
-		wt_exp = exp(strength * log(bufferN1S[bandIndex] / bufferN1M[bandIndex]));
-		// the following code may or may not be correct.
-		// This version calulates things directly to how it's done in the plugin
-		wt_exp = min(wt_exp, 1);
-		weight = 1-wt_exp;
-		// explanation:
-		// based on the following nyquist in vocalrediso.ny:
-		// (setf *map* (snd-pwl 0 10000 (list 0 0.5 10000 0.0 20000 -0.5 20001)))
-		// (shape wt-exp *map* 0)
-		// which appears to be a linear mapping of 0 to 0.5 and 1 to 0
-		// (and everything below 0 to 0.5, and above to 0)
-		// however I've found that's off by a factor of 2 (~6db)
-		
-		// if this frequency bin is within the appropriate range,
-		// then process it, otherwise zero it out
-		(
 			bandIndex >= lowBin && bandIndex < highBin ?
 			(
+				frac = (bandIndex - lowBin)/(highBin - lowBin - 1);
+				strength = slider3 * ((slider4 / slider3) ^ frac);
+				// equivalent to slider3^(1-frac) * slider4^(frac)
+				// which is an exponential interpolation mirroring the following linear
+				// interpolation
+				// strength = slider3 * (1 - frac) + slider4 * (frac);
+				s = bufferN1S[bandIndex];
+				m = bufferN1M[bandIndex];
+				wt_exp = exp(strength * (log(s) - log(m)));
+				// equivalent to (s / m) ^ strength (assuming no error)
+				wt_exp = min(wt_exp, 1);
+				weight = 1-wt_exp;
+				// explanation:
+				// based on the following nyquist in vocalrediso.ny:
+				// (setf *map* (snd-pwl 0 10000 (list 0 0.5 10000 0.0 20000 -0.5 20001)))
+				// (shape wt-exp *map* 0)
+				// which appears to be a linear mapping of 0 to 0.5 and 1 to 0
+				// (and everything below 0 to 0.5, and above to 0)
+				// however I've found that's off by a factor of 2 (~6db)
+				
+				// if this frequency bin is within the appropriate range,
+				// then process it, otherwise zero it out
+				// 
 				fftBuffer[bandIndex * 2 + 0] *= weight / SIZE;
 				fftBuffer[bandIndex * 2 + 1] *= weight / SIZE;
 			) : (
 				fftBuffer[bandIndex * 2 + 0] = 0;
 				fftBuffer[bandIndex * 2 + 1] = 0;
-			)
-		);
+			);
 		bandIndex += 1;
 	);
 	
@@ -272,4 +284,3 @@ samplesCollected == SIZE/2 ? (
 
 // sliders are serialized automatically
 // thus nothing to serialize, as nothing else makes sense to store
-
