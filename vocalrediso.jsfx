@@ -5,13 +5,17 @@ desc: vocal removal/isolation
 //tags: processing vocals stereo
 //author: Michael Pannekoek
 
-slider1:100<-100,100,0.1>dry mix
-slider2:-100<-100,100,0.1>C mix 
-slider3:1<0.1,50,0.1>strength at Low Cut
-slider4:1<0.1,50,0.1>strength at High Cut
+slider1:0<-100,100,0.1>dry mix
+slider2:-100<-100,100,0.1>C mix (Vocals)
+slider3:0<-5,5,0.001>strength at Low Cut
+slider4:0<-5,5,0.001>strength at High Cut
 slider5:120<0,24000>Low Cut (Vocals)
 slider6:9000<0,24000>High Cut (Vocals)
 slider7:0<-90,90,1>Phase (Degrees)
+slider8:90<1,180,0.1>Phase width at Low Cut (Degrees)
+slider9:90<1,180,0.1>Phase width at High Cut (Degrees)
+slider10:1<0,1,0.05>Attenuate if different volume
+slider11:1<0,1,1{No,Yes}>undo rotation due to phase
 
 in_pin:left input
 in_pin:right input
@@ -29,6 +33,32 @@ rotation = slider7*$pi/180;
 // convert percentage to raw scale factor
 dryMix = slider1/100;
 centreMix = slider2/100;
+lowStrength = slider3;
+highstrength = slider4;
+phaseWlow = slider8*$pi/180;
+phaseWhigh = slider9*$pi/180;
+cosine = cos(rotation);
+sine = sin(rotation);
+// fill strengthBuffer and phaseWbuffer
+bandIndex = 0;
+loop(SIZE,
+	bandIndex >= lowBin && bandIndex < highBin ? (
+		// only set values for the appropriate frequency range
+		frac = (bandIndex - lowBin)/(highBin - lowBin - 1);
+		// fraction of progress through range [lowBin, highBin)
+		strength = lowStrength* (1 - frac) + highStrength * frac;
+		strengthBuffer[bandIndex] = 10^strength;
+		// precaculate strength (actual value should be positive, so it makes
+		// sense to take the power of ten, but only after the
+		// linear mapping over the spectrum is done.
+		phaseW = phaseWlow * (1 - frac) + phaseWhigh * frac;
+		phaseWbuffer[bandIndex] = phaseW;
+		// precalculate phase width
+	);
+	
+	bandIndex += 1;
+	// next index
+);
 
 
 
@@ -44,22 +74,20 @@ silence = 2;
 bufferL = SIZE*0;
 bufferI1L = SIZE*1;
 bufferI2L = SIZE*2;
+bufferFFTIL = SIZE*3;
+// fft has real and complex values thus is twice as large
 // Right channel
-bufferR = SIZE*3;
-bufferI1R = SIZE*4;
-bufferI2R = SIZE*5;
- // square norm of mid channel fft (L+R)
-bufferN1M = SIZE*6;
-bufferN2M = SIZE*7;
- // square norm of side channel fft (L_R)
-bufferN1S = SIZE*8; // power sum of side channel
-bufferN2S = SIZE*9;
-// Center
+bufferR = SIZE*5;
+bufferI1R = SIZE*6;
+bufferI2R = SIZE*7;
+bufferFFTIR = SIZE*8;
+// fft has real and complex values thus is twice as large
 bufferO1C = SIZE*10;
 bufferO2C = SIZE*11;
-// temporary buffer for storing fft input and result
-fftBuffer = SIZE*12;
-freembuf(SIZE*14 + 1);
+bufferFFTO = SIZE*12;
+strengthBuffer = SIZE*14;
+phaseWbuffer = SIZE*15;
+freembuf(SIZE*16 + 1);
 
 // samplesCollected tracks the position in the last of the two tiles
 // ranges from 0 to (SIZE/2)-1
@@ -79,16 +107,8 @@ pdc_bot_ch = 0; pdc_top_ch = 2;
 
 
 @sample
-// calculate the square of the norm for a single frequency band
-function normSquared(bReal bImag)
-(
-	(sqr(bReal)+sqr(bImag)); 
-);
-
 // input corrections:
 // rotate stereo field to isloate different phases
-cosine = cos(rotation);
-sine = sin(rotation);
 sampleLeft = cosine * spl0 - sine * spl1;
 sampleRight = sine * spl0 + cosine * spl1;
 // that's a lowercase L in spl, not the number 1.
@@ -120,10 +140,14 @@ outR = rightPart + centrePart;
 
 // output audio, undoing rotation
 silence == 0 ? (
-	spl0 = outL * cosine + outR * sine;
-	spl1 = outR * cosine - outL * sine;
+	slider11 == 0 ? (
+		spl0 = outL;
+		spl1 = outR;
+	) : (
+		spl0 = outL * cosine + outR * sine;
+		spl1 = outR * cosine - outL * sine;
+	);
 ) : spl0 = spl1 = 0;
-// if x evaluates to 0, x ? y will return 0
 
 // write to buffers:
 // Left + Right input buffers
@@ -151,14 +175,13 @@ samplesCollected == SIZE/2 ? (
 	samplesCollected = 0;
 	// wrap back to 0 on the tile
 	
-	// calculate fft for side channel (difference)
+	// calculate fft for left channel
 	// Loop over each of the audio samples, from index = 0 to SIZE - 1.
 	index = 0;
 	loop(SIZE,
-		diff = bufferI1L[index] - bufferI1R[index];
-		fftBuffer[2 * index + 0] = diff;
+		bufferFFTIL[2 * index + 0] = bufferI1L[index];
 		// Real part
-		fftBuffer[2 * index + 1] = 0.0;
+		bufferFFTIL[2 * index + 1] = 0.0;
 		// Imaginary part
 		index += 1;
 		// Next index
@@ -166,98 +189,84 @@ samplesCollected == SIZE/2 ? (
 	// calculate fft in place
 	// size specifies the number of bins
 	// (one complex number for each bin)
-	fft(fftBuffer, SIZE);
+	fft(bufferFFTIL, SIZE);
 	// need to permute the frequency bins to get them in the right order
 	// See https://www.reaper.fm/sdk/js/advfunc.php#js_advanced for more info.
-	fft_permute(fftBuffer, SIZE);
+	fft_permute(bufferFFTIL, SIZE);
 	
-	bandIndex = 0;
-	loop(SIZE,
-		bufferN1S[bandIndex] = normSquared(
-			fftBuffer[2 * bandIndex + 0],
-			fftBuffer[2 * bandIndex + 1]
-		);
-		bandIndex += 1;
-	);
-	
-	// calculate fft for mid channel (sum)
-	// This will overwrite the fft for the side
-	// located in fftBuffer, which is no longer needed.
-	// loop over each of the audio samples, from index = 0 to SIZE - 1.
+	// calculate fft for right channel
+	// Loop over each of the audio samples, from index = 0 to SIZE - 1.
 	index = 0;
 	loop(SIZE,
-		sum = bufferI1L[index] + bufferI1R[index];
-		fftBuffer[2 * index + 0] = sum;
+		bufferFFTIR[2 * index + 0] = bufferI1R[index];
 		// Real part
-		fftBuffer[2 * index + 1] = 0.0;
+		bufferFFTIR[2 * index + 1] = 0.0;
 		// Imaginary part
 		index += 1;
 		// Next index
 	);
-	// calculate fft in place 
-	fft(fftBuffer, SIZE);
+	// calculate fft in place
+	// size specifies the number of bins
+	// (one complex number for each bin)
+	fft(bufferFFTIR, SIZE);
 	// need to permute the frequency bins to get them in the right order
 	// See https://www.reaper.fm/sdk/js/advfunc.php#js_advanced for more info.
-	fft_permute(fftBuffer, SIZE);
-	
-	bandIndex = 0;
-	loop(SIZE,
-		bufferN1M[bandIndex] = normSquared(
-			fftBuffer[2 * bandIndex + 0],
-			fftBuffer[2 * bandIndex + 1]
-		);
-		bandIndex += 1;
-	);
+	fft_permute(bufferFFTIR, SIZE);
 	
 	
-	// Compute center channel:
-	// Make a weighted center (mono)
+	// Compute center:
+	// Make a weighted center (mono with respect to phase)
 	// that can be substracted from L&R
 	// we start off with the fft of the mid channel in the fftBuffer
 	bandIndex = 0;
 	loop(SIZE,
 			bandIndex >= lowBin && bandIndex < highBin ?
 			(
-				frac = (bandIndex - lowBin)/(highBin - lowBin - 1);
-				strength = slider3 * ((slider4 / slider3) ^ frac);
-				// equivalent to slider3^(1-frac) * slider4^(frac)
-				// which is an exponential interpolation mirroring the following linear
-				// interpolation
-				// strength = slider3 * (1 - frac) + slider4 * (frac);
-				s = bufferN1S[bandIndex];
-				m = bufferN1M[bandIndex];
-				wt_exp = exp(strength * (log(s) - log(m)));
-				// equivalent to (s / m) ^ strength (assuming no error)
-				wt_exp = min(wt_exp, 1);
-				weight = 1-wt_exp;
-				// explanation:
-				// based on the following nyquist in vocalrediso.ny:
-				// (setf *map* (snd-pwl 0 10000 (list 0 0.5 10000 0.0 20000 -0.5 20001)))
-				// (shape wt-exp *map* 0)
-				// which appears to be a linear mapping of 0 to 0.5 and 1 to 0
-				// (and everything below 0 to 0.5, and above to 0)
-				// however I've found that's off by a factor of 2 (~6db)
-				
-				// if this frequency bin is within the appropriate range,
-				// then process it, otherwise zero it out
-				// 
-				fftBuffer[bandIndex * 2 + 0] *= weight / SIZE;
-				fftBuffer[bandIndex * 2 + 1] *= weight / SIZE;
+				Lreal = bufferFFTIL[bandIndex * 2];
+				Limag = bufferFFTIL[bandIndex * 2 + 1];
+				Rreal = bufferFFTIR[bandIndex * 2];
+				Rimag = bufferFFTIR[bandIndex * 2 + 1];
+				strength = strengthBuffer[bandIndex];
+				// get strength
+				phaseW = phaseWbuffer[bandIndex];
+				// get phase width
+				normL = sqrt(sqr(Lreal) + sqr(Limag));
+				normR = sqrt(sqr(Rreal) + sqr(Rimag));
+				normprod = normL * normR;
+				//sinval = (Lreal * Rimag - Limag * Rreal);
+				cosineval = (Lreal * Rreal + Limag * Rimag) / normprod;
+				uncapped = acos(cosineval) / phaseW;
+				weight1 = min(1, uncapped);
+				weight2 = 1 - (weight1 ^ strength);
+				// attenuate if relative norms are very different, and option enabled
+				atten = 1 - (sqr(normL - normR)/sqr(normL + normR));
+				weight = weight2 * atten ^ (strength * slider10);
+				weight-1 < zzzminweight ? zzzminweight = weight-1;
+				fftOutReal = Lreal + Rreal;
+				fftOutImag = Limag + Rimag;
+				// isolate the mid fft (can just sum real and imaginary component
+				// since fft is a linear operator)
+				fftOutReal *= weight / SIZE;
+				fftOutImag *= weight / SIZE;
+				// attenuate by weight to do the actual isolation, and divide by SIZE
+				// to normalize the fft (since SIZE entries in fft buffer)
+				bufferFFTO[bandIndex * 2] = fftOutReal;
+				bufferFFTO[bandIndex * 2 + 1] = fftOutImag;
 			) : (
-				fftBuffer[bandIndex * 2 + 0] = 0;
-				fftBuffer[bandIndex * 2 + 1] = 0;
+				bufferFFTO[bandIndex * 2] = 0;
+				bufferFFTO[bandIndex * 2 + 1] = 0;
 			);
 		bandIndex += 1;
 	);
 	
 	// apply ifft to calculate center channel, which should now be present in fftBuffer
-	fft_ipermute(fftBuffer, SIZE);
-	ifft(fftBuffer, SIZE);
+	fft_ipermute(bufferFFTO, SIZE);
+	ifft(bufferFFTO, SIZE);
 	
 	// Copy from the complex numbers in fftBuffer to the center tile:
 	index = 0;
 	loop(SIZE,
-		bufferO1C[index] = fftBuffer[2 * index + 0];
+		bufferO1C[index] = bufferFFTO[2 * index + 0];
 		index += 1;
 	);
 	
@@ -268,14 +277,6 @@ samplesCollected == SIZE/2 ? (
 	temp = bufferI1R;
 	bufferI1R = bufferI2R;
 	bufferI2R = temp;
-	
-	temp = bufferN1M;
-	bufferN1M = bufferN2M;
-	bufferN2M = temp;
-	
-	temp = bufferN1S;
-	bufferN1S = bufferN2S;
-	bufferN2S = temp;
 	
 	temp = bufferO1C;
 	bufferO1C = bufferO2C;
