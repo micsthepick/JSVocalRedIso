@@ -19,11 +19,20 @@ After it installs, copy vocalrediso.jsfx to somewhere in `...\ReaPlugs\JS` at th
 - Vocal Reduction (Karaoke)  
 set dry mix to 100%, and centre mix to -100% (subtract the center from the mix), and adjust the Low Cut untill drums/bass
 instruments are still audible enough, without hearing too much vocals,
-and adjust the high cut so that it is high enough that the vocals don't bleed through
+and adjust the high cut so that it is high enough that the vocals don't bleed through. This is better than the usual subtract one channel from the other approach, as the result is still a stereo signal.
 
 - Vocal Isolation (Acapella)  
-Set dry mix to 0%, and Centre mix to -100% or 100%. Adjust low cut and high cut so that vocals sound good, but not to much other elements of the mix leak through 
+Set dry mix to 0%, and Center mix to -100% or 100%. Adjust low cut and high cut so that vocals sound good, but not to much other elements of the mix leak through 
 (-100% can be used to make a seperate duplicate track that can be faded to blend between different modes).
+
+- Fine tuning  
+Adjust stregth and phase width (how close are the two signals to the same phase) at low cut and high cut to change how much each part of the center signal goes through over the spectrum.
+"Attenuate if different volume" can sometimes help to reduce artifacts, expect there to be less in the center signal when this is set to 1. I have not done much fine tuning myself, so it helps to experiment to see what helps. Generally each individual track should have it's own fine tuning
+
+- Messing with phase  
+"Phase (degrees)" controls what pan in the stereo track the centre signal will be constructed from. 0 Means exaclty the centre, 45 means panned hard left, -45 means panned hard right.
+sometimes setting the phase to 90 or -90 (and setting dry mix to 0) can isolate things that are not centre panned and can give a better seperation (e.g. for karaoke wen centre subtraction does not give good results), however it will also only give a mono signal in that case.  
+If you set the phase to anything but 0, if dry mix is 0, to have a balanced output it is recommended to enable "undo rotation due to phase", unless you plan to combine the output of the plugin with the original input (compensating for the introduced delay)
 
 ### A word of caution
 Some tracks are mixed in such a way that the results from this plugin will not be so sucessful.  
