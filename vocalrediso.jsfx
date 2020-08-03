@@ -70,21 +70,18 @@ SIZE = 8192;
 // to mute the first inital buffers
 silence = 2;
 
-// Left channel
-bufferL = SIZE*0;
-bufferI1L = SIZE*1;
-bufferI2L = SIZE*2;
-bufferFFTIL = SIZE*3;
 // fft has real and complex values thus is twice as large
-// Right channel
-bufferR = SIZE*5;
-bufferI1R = SIZE*6;
-bufferI2R = SIZE*7;
-bufferFFTIR = SIZE*8;
-// fft has real and complex values thus is twice as large
-bufferO1C = SIZE*10;
-bufferO2C = SIZE*11;
-bufferFFTO = SIZE*12;
+bufferFFTIL = SIZE*0;
+bufferFFTIR = SIZE*2;
+bufferFFTO = SIZE*4;
+bufferL = SIZE*6;
+bufferI1L = SIZE*7;
+bufferI2L = SIZE*8;
+bufferR = SIZE*9;
+bufferI1R = SIZE*10;
+bufferI2R = SIZE*11;
+bufferO1C = SIZE*12;
+bufferO2C = SIZE*13;
 strengthBuffer = SIZE*14;
 phaseWbuffer = SIZE*15;
 freembuf(SIZE*16 + 1);
