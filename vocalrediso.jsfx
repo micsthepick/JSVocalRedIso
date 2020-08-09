@@ -16,6 +16,7 @@ slider8:90<1,180,0.1>Phase width at Low Cut (Degrees)
 slider9:90<1,180,0.1>Phase width at High Cut (Degrees)
 slider10:1<0,1,0.05>Attenuate if different volume
 slider11:1<0,1,1{No,Yes}>undo rotation due to phase
+slider12:0<0,1,1{Hann,Lanczos (sinc),Blackman-Harris,Blackman-Nutall,Nutall}>FFT window
 
 in_pin:left input
 in_pin:right input
@@ -25,6 +26,13 @@ out_pin:right output
 
 
 @slider
+// calculate sinc, handling 0 as the limiting value
+function sinc(x)
+(
+	sincIn = $pi * x;
+	sincIn == 0 ? 1 : sin(sincIn) / sincIn;
+);
+
 // convert low cut and high cut to bins every time a slider is changed
 lowBin = min(slider5, slider6) / srate * SIZE;
 highBin = max(slider6, slider5) / srate * SIZE;
@@ -39,10 +47,11 @@ phaseWlow = slider8*$pi/180;
 phaseWhigh = slider9*$pi/180;
 cosine = cos(rotation);
 sine = sin(rotation);
-// fill strengthBuffer and phaseWbuffer
+// fill strengthBuffer and phaseWBuffer
 bandIndex = 0;
 loop(SIZE,
-	bandIndex >= lowBin && bandIndex < highBin ? (
+	bandIndex >= lowBin && bandIndex < highBin ?
+	(
 		// only set values for the appropriate frequency range
 		frac = (bandIndex - lowBin)/(highBin - lowBin - 1);
 		// fraction of progress through range [lowBin, highBin)
@@ -52,8 +61,32 @@ loop(SIZE,
 		// sense to take the power of ten, but only after the
 		// linear mapping over the spectrum is done.
 		phaseW = phaseWlow * (1 - frac) + phaseWhigh * frac;
-		phaseWbuffer[bandIndex] = phaseW;
+		phaseWBuffer[bandIndex] = phaseW;
 		// precalculate phase width
+	);
+	
+	slider12 == 0 ?
+	(
+		windowBuffer[bandIndex] = 0.5 - 0.5 * cos(2*$pi*bandIndex/SIZE);
+	);
+	slider12 == 1 ?
+	(
+		windowBuffer[bandIndex] = sinc(2 * bandIndex / SIZE - 1);
+	);
+	slider12 == 2 ?
+	(
+		cosIn = $pi * bandIndex / SIZE;
+		windowBuffer[bandIndex] = 0.35875 - 0.48829 * cos(2 * cosIn) + 0.14128 * cos(4 * cosIn) - 0.01168 * cos(6 * cosIn);
+	);
+	slider12 == 3 ?
+	(
+		cosIn = $pi * bandIndex / SIZE;
+		windowBuffer[bandIndex] = 0.3635819 - 0.4891775 * cos(2 * cosIn) + 0.1365995 * cos(4 * cosIn) - 0.0106411 * cos(6 * cosIn);
+	);
+	slider12 == 4 ?
+	(
+		cosIn = $pi * bandIndex / SIZE;
+		windowBuffer[bandIndex] = 0.355768 - 0.487396 * cos(2 * cosIn) + 0.144232 * cos(4 * cosIn) - 0.012604 * cos(6 * cosIn);
 	);
 	
 	bandIndex += 1;
@@ -83,8 +116,9 @@ bufferI2R = SIZE*11;
 bufferO1C = SIZE*12;
 bufferO2C = SIZE*13;
 strengthBuffer = SIZE*14;
-phaseWbuffer = SIZE*15;
-freembuf(SIZE*16 + 1);
+phaseWBuffer = SIZE*15;
+windowBuffer = SIZE*16;
+freembuf(SIZE*17 + 1);
 
 // samplesCollected tracks the position in the last of the two tiles
 // ranges from 0 to (SIZE/2)-1
@@ -115,11 +149,11 @@ sampleRight = sine * spl0 + cosine * spl1;
 tilePos1 = samplesCollected + SIZE/2;
 tilePos2 = samplesCollected;
 
-// apply the hann envelope while writing the sample into the tile buffer
-// See https://en.wikipedia.org/wiki/Window_function#Hann_and_Hamming_windows
-hannWindowTile1 = 0.5 - 0.5 * cos(2*$pi*tilePos1/SIZE);
-hannWindowTile2 = 1 - hannWindowTile1;
-// hannWindowTile2 has a relationship to the other window tile, so
+// apply the selected envelope while writing the sample into the tile buffer
+// See https://en.wikipedia.org/wiki/Window_function
+windowTile1 = windowBuffer[tilePos1];
+windowTile2 = windowBuffer[tilePos2];
+// windowTile2 has a relationship to the other window tile, so
 // it is epressed in this way for accuracy and speed
 
 // subtract or output the center channel from L and R based on slider1
@@ -129,6 +163,12 @@ hannWindowTile2 = 1 - hannWindowTile1;
 inL = bufferL[offset];
 inR = bufferR[offset];
 outC = bufferO1C[tilePos1] + bufferO2C[tilePos2];
+// if not hann window, account for how the two overlap positions
+// in the window don't add to 1
+slider12 != 0 ?
+(
+	outC /= (windowBuffer[tilePos1] + windowBuffer[tilePos2]);
+);
 centrePart = outC * centreMix;
 leftPart = inL * dryMix;
 rightPart = inR * dryMix;
@@ -137,7 +177,8 @@ outR = rightPart + centrePart;
 
 // output audio, undoing rotation
 silence == 0 ? (
-	slider11 == 0 ? (
+	slider11 == 0 ?
+	(
 		spl0 = outL;
 		spl1 = outR;
 	) : (
@@ -148,10 +189,10 @@ silence == 0 ? (
 
 // write to buffers:
 // Left + Right input buffers
-bufferI1L[tilePos1] = sampleLeft * hannWindowTile1;
-bufferI2L[tilePos2] = sampleLeft * hannWindowTile2;
-bufferI1R[tilePos1] = sampleRight * hannWindowTile1;
-bufferI2R[tilePos2] = sampleRight * hannWindowTile2;
+bufferI1L[tilePos1] = sampleLeft * windowTile1;
+bufferI2L[tilePos2] = sampleLeft * windowTile2;
+bufferI1R[tilePos1] = sampleRight * windowTile1;
+bufferI2R[tilePos2] = sampleRight * windowTile2;
 
 // set original L & R buffers
 bufferL[offset] = sampleLeft;
@@ -161,12 +202,14 @@ bufferR[offset] = sampleRight;
 offset += 1;
 samplesCollected += 1;
 
-offset == SIZE ? (
+offset == SIZE ?
+(
 	offset = 0;
 );
 
 // once we reach the end of a tile:
-samplesCollected == SIZE/2 ? (
+samplesCollected == SIZE/2 ?
+(
 	// make silence go to 0
 	silence > 0 ? silence -= 1;
 	samplesCollected = 0;
@@ -225,7 +268,7 @@ samplesCollected == SIZE/2 ? (
 				Rimag = bufferFFTIR[bandIndex * 2 + 1];
 				strength = strengthBuffer[bandIndex];
 				// get strength
-				phaseW = phaseWbuffer[bandIndex];
+				phaseW = phaseWBuffer[bandIndex];
 				// get phase width
 				normL = sqrt(sqr(Lreal) + sqr(Limag));
 				normR = sqrt(sqr(Rreal) + sqr(Rimag));
@@ -238,7 +281,7 @@ samplesCollected == SIZE/2 ? (
 				// attenuate if relative norms are very different, and option enabled
 				atten = 1 - (sqr(normL - normR)/sqr(normL + normR));
 				weight = weight2 * atten ^ (strength * slider10);
-				weight-1 < zzzminweight ? zzzminweight = weight-1;
+													  
 				fftOutReal = Lreal + Rreal;
 				fftOutImag = Limag + Rimag;
 				// isolate the mid fft (can just sum real and imaginary component
@@ -278,7 +321,7 @@ samplesCollected == SIZE/2 ? (
 	temp = bufferO1C;
 	bufferO1C = bufferO2C;
 	bufferO2C = temp;
-)
+);
 
 // sliders are serialized automatically
 // thus nothing to serialize, as nothing else makes sense to store
