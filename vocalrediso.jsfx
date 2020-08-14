@@ -48,8 +48,8 @@ phaseWhigh = slider9*$pi/180;
 cosine = cos(rotation);
 sine = sin(rotation);
 // fill strengthBuffer and phaseWBuffer
-bandIndex = 0;
-loop(SIZE,
+bandIndex = 1;
+loop(SIZE-1,
 	bandIndex >= lowBin && bandIndex < highBin ?
 	(
 		// only set values for the appropriate frequency range
