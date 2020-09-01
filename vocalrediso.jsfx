@@ -16,7 +16,7 @@ slider8:90<1,180,0.1>Phase width at Low Cut (Degrees)
 slider9:90<1,180,0.1>Phase width at High Cut (Degrees)
 slider10:1<0,1,0.05>Attenuate if different volume
 slider11:1<0,1,1{No,Yes}>undo rotation due to phase
-slider12:0<0,1,1{Hann,Lanczos (sinc),Blackman-Harris,Blackman-Nutall,Nutall}>FFT window
+slider12:0<0,5,1{Hann,Triangular,Lanczos (sinc),Blackman-Harris,Blackman-Nutall,Nutall}>FFT window
 
 in_pin:left input
 in_pin:right input
@@ -69,21 +69,28 @@ loop(SIZE-1,
 	(
 		windowBuffer[bandIndex] = 0.5 - 0.5 * cos(2*$pi*bandIndex/SIZE);
 	);
-	slider12 == 1 ?
-	(
-		windowBuffer[bandIndex] = sinc(2 * bandIndex / SIZE - 1);
+	slider12 == 1 ? (
+		windowBuffer[bandIndex] = bandIndex < SIZE/2 ? (
+			bandIndex / (SIZE/2-1)
+		) : (
+			(SIZE-bandIndex-1) / (SIZE/2-1)
+		);
 	);
 	slider12 == 2 ?
 	(
-		cosIn = $pi * bandIndex / SIZE;
-		windowBuffer[bandIndex] = 0.35875 - 0.48829 * cos(2 * cosIn) + 0.14128 * cos(4 * cosIn) - 0.01168 * cos(6 * cosIn);
+		windowBuffer[bandIndex] = sinc(2 * bandIndex / SIZE - 1);
 	);
 	slider12 == 3 ?
 	(
 		cosIn = $pi * bandIndex / SIZE;
-		windowBuffer[bandIndex] = 0.3635819 - 0.4891775 * cos(2 * cosIn) + 0.1365995 * cos(4 * cosIn) - 0.0106411 * cos(6 * cosIn);
+		windowBuffer[bandIndex] = 0.35875 - 0.48829 * cos(2 * cosIn) + 0.14128 * cos(4 * cosIn) - 0.01168 * cos(6 * cosIn);
 	);
 	slider12 == 4 ?
+	(
+		cosIn = $pi * bandIndex / SIZE;
+		windowBuffer[bandIndex] = 0.3635819 - 0.4891775 * cos(2 * cosIn) + 0.1365995 * cos(4 * cosIn) - 0.0106411 * cos(6 * cosIn);
+	);
+	slider12 == 5 ?
 	(
 		cosIn = $pi * bandIndex / SIZE;
 		windowBuffer[bandIndex] = 0.355768 - 0.487396 * cos(2 * cosIn) + 0.144232 * cos(4 * cosIn) - 0.012604 * cos(6 * cosIn);
@@ -165,7 +172,7 @@ inR = bufferR[offset];
 outC = bufferO1C[tilePos1] + bufferO2C[tilePos2];
 // if not hann window, account for how the two overlap positions
 // in the window don't add to 1
-slider12 != 0 ?
+slider12 > 1 ?
 (
 	outC /= (windowBuffer[tilePos1] + windowBuffer[tilePos2]);
 );
