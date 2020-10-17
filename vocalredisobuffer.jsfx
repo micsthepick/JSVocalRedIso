@@ -108,7 +108,6 @@ loop(SIZE,
 
 
 @init
-slider2 = -100;
 // init variables
 // FFT - fft window size (will be constant)
 SIZE = 8192;
@@ -123,16 +122,18 @@ bufferFFTIR = SIZE*2;
 bufferFFTO = SIZE*4;
 bufferI1L = SIZE*6;
 bufferI2L = SIZE*7;
-bufferI1R = SIZE*8;
-bufferI2R = SIZE*9;
-bufferO1C = SIZE*10;
-bufferO2C = SIZE*11;
-strengthBuffer = SIZE*12;
-phaseWBuffer = SIZE*13;
-windowBuffer = SIZE*14;
-bufferIL = SIZE*15;
-bufferIR = SIZE*15+8192;
-freembuf(SIZE*15+16385);
+bufferIL = SIZE*8;
+bufferI1R = SIZE*9;
+bufferI2R = SIZE*10;
+bufferIR = SIZE*11;
+bufferO1C = SIZE*12;
+bufferO2C = SIZE*13;
+strengthBuffer = SIZE*14;
+phaseWBuffer = SIZE*15;
+windowBuffer = SIZE*16;
+bufferIL = SIZE*17;
+bufferIR = SIZE*17+8192;
+freembuf(SIZE*17+16385);
 
 // samplesCollected tracks the position in the last of the two tiles
 // ranges from 0 to (SIZE/2)-1
@@ -187,8 +188,8 @@ windowTile2 = windowBuffer[tilePos2];
 // if slider1 is less than two, the Left channel is present in the output
 // if slider1 is equal to 2, then the center channel is present in the output,
 // otherwise it is subtracted
-inL = bufferI1L[tilePos1] + bufferI2L[tilePos2];
-inR = bufferI1R[tilePos1] + bufferI2R[tilePos2];
+inL = bufferIL[offset];
+inR = bufferIR[offset];
 outC = bufferO1C[tilePos1] + bufferO2C[tilePos2];
 // if not hann window, account for how the two overlap positions
 // in the window don't add to 1
@@ -213,6 +214,9 @@ silence == 0 ? (
 		spl1 = outR * cosine + outL * sine;
 	);
 ) : spl0 = spl1 = 0;
+
+bufferIL[offset] = sampleLeft;
+bufferIR[offset] = sampleRight;
 
 // write to buffers:
 // Left + Right input buffers
