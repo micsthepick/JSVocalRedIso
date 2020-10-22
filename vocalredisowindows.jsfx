@@ -17,7 +17,7 @@ slider9:90<1,180,0.1>Phase width at High Cut (Degrees)
 slider10:1<0,1,0.05>Attenuate if different volume
 slider11:1<0,1,1{No,Yes}>undo rotation due to phase
 slider12:0<0,5,1{Hann,Triangular,Lanczos (sinc),Blackman-Harris,Blackman-Nutall,Nutall}>pre FFT window
-slider13:0<0,5,1{None,Hann,Triangular,Lanczos (sinc),Blackman-Harris,Blackman-Nutall,Nutall}>post FFT window
+slider13:2<0,5,1{None,Hann,Triangular,Lanczos (sinc),Blackman-Harris,Blackman-Nutall,Nutall}>post FFT window
 slider14:0<-180,180,1>Phase2 (Degrees)
 slider15:0<0,8192,1>Input buffering (delay, reduce clicks)
 
