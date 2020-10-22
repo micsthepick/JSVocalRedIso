@@ -160,19 +160,19 @@ bufferFFTIR = SIZE*2;
 bufferFFTO = SIZE*4;
 bufferI1L = SIZE*6;
 bufferI2L = SIZE*7;
-bufferIL = SIZE*8;
+bufferDryL = SIZE*8;
 bufferI1R = SIZE*9;
 bufferI2R = SIZE*10;
-bufferIR = SIZE*11;
+bufferDryR = SIZE*11;
 bufferO1C = SIZE*12;
 bufferO2C = SIZE*13;
 strengthBuffer = SIZE*14;
 phaseWBuffer = SIZE*15;
 windowBuffer1 = SIZE*16;
 windowBuffer2 = SIZE*17;
-bufferIL = SIZE*18;
-bufferIR = SIZE*18+8192;
-freembuf(SIZE*18+16385);
+inputbufL = SIZE*18;
+inputbufR = SIZE*18+8192;
+freembuf(SIZE*18+16384);
 
 // samplesCollected tracks the position in the last of the two tiles
 // ranges from 0 to (SIZE/2)-1
@@ -181,7 +181,7 @@ samplesCollected = 0;
 offset = 0;
 
 // position in input buffer
-bufPos = 0;
+inPos = 0;
 
 // tell reaper what delay this plugin will introduce,
 // so that it can be compensated for
@@ -195,6 +195,10 @@ pdc_bot_ch = 0; pdc_top_ch = 2;
 
 
 @sample
+// store raw samples for later storing in input buffer
+firstL = spl0;
+firstR = spl1;
+
 // input corrections:
 // rotate stereo field to isloate different phases
 // and read input from buffer
@@ -203,10 +207,8 @@ slider15 == 0 ?
 	sampleLeft = cosine * spl0 + sine * spl1;
 	sampleRight = - sine * spl0 + cosine * spl1;
 ) : (
-	sampleLeft = bufferIL[inPos];
-	bufferIL[inPos] = cosine * spl0 + sine * spl1;
-	sampleRight = bufferIR[inPos];
-	bufferIR[inPos] = - sine * spl0 + cosine * spl1;
+	sampleLeft = cosine * inputbufL[inPos] + sine * inputbufR[inPos];
+	sampleRight =  - sine * inputbufL[inPos] + cosine * inputbufR[inPos];
 );
 
 // that's a lowercase L in spl, not the number 1.
@@ -227,8 +229,8 @@ windowTile2 = windowBuffer1[tilePos2];
 // if slider1 is less than two, the Left channel is present in the output
 // if slider1 is equal to 2, then the center channel is present in the output,
 // otherwise it is subtracted
-inL = bufferIL[offset];
-inR = bufferIR[offset];
+dryL = bufferDryL[offset];
+dryR = bufferDryR[offset];
 outPart1 = bufferO1C[tilePos1] * windowBuffer2[tilePos1];
 outPart2 = bufferO2C[tilePos2] * windowBuffer2[tilePos2];
 outScale = windowBuffer1[tilePos1] * windowBuffer2[tilePos1] + windowBuffer1[tilePos2] * windowBuffer2[tilePos2];
@@ -237,10 +239,14 @@ outC = (outPart1 + outPart2) / outScale;
 // in the window don't add to 1
 
 centrePart = outC * centreMix;
-leftPart = inL * dryMix;
-rightPart = inR * dryMix;
+leftPart = dryL * dryMix;
+rightPart = dryR * dryMix;
 outL = leftPart + centrePart;
 outR = rightPart + centrePart;
+
+// write to dry buffers
+bufferDryL[offset] = sampleLeft;
+bufferDryR[offset] = sampleRight;
 
 // output audio, undoing rotation
 silence == 0 ? (
@@ -254,8 +260,8 @@ silence == 0 ? (
 	);
 ) : spl0 = spl1 = 0;
 
-bufferIL[offset] = sampleLeft;
-bufferIR[offset] = sampleRight;
+inputbufL[inPos] = firstL;
+inputbufR[inPos] = firstR;
 
 // write to buffers:
 // Left + Right input buffers
