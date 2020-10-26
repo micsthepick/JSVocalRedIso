@@ -6,17 +6,20 @@ desc: vocal removal/isolation
 //author: Michael Pannekoek
 
 slider1:0<-100,100,0.1>dry mix
-slider2:-100<-100,100,0.1>C mix (Vocals)
+slider2:0<-100,100,0.1>C mix (Vocals)
 slider3:0<-5,5,0.001>strength at Low Cut
 slider4:0<-5,5,0.001>strength at High Cut
-slider5:120<0,24000>Low Cut (Vocals)
-slider6:9000<0,24000>High Cut (Vocals)
+slider5:80<0,24000>Low Cut (Vocals)
+slider6:24000<0,24000>High Cut (Vocals)
 slider7:0<-90,90,1>Phase (Degrees)
 slider8:90<1,180,0.1>Phase width at Low Cut (Degrees)
 slider9:90<1,180,0.1>Phase width at High Cut (Degrees)
 slider10:1<0,1,0.05>Attenuate if different volume
 slider11:1<0,1,1{No,Yes}>undo rotation due to phase
-slider12:0<0,5,1{Hann,Triangular,Lanczos (sinc),Blackman-Harris,Blackman-Nutall,Nutall}>FFT window
+slider12:0<0,5,1{Hann,Triangular,Lanczos (sinc),Blackman-Harris,Blackman-Nutall,Nutall}>pre FFT window
+slider13:2<0,5,1{None,Hann,Triangular,Lanczos (sinc),Blackman-Harris,Blackman-Nutall,Nutall}>post FFT window
+slider14:0<-180,180,1>Phase2 (Degrees)
+slider15:0<0,8192,1>Input buffering (delay, reduce clicks)
 
 in_pin:left input
 in_pin:right input
@@ -47,9 +50,11 @@ phaseWlow = slider8*$pi/180;
 phaseWhigh = slider9*$pi/180;
 cosine = cos(rotation);
 sine = sin(rotation);
+cosine2 = cos(slider14*$pi/180);
+sine2 = sin(slider14*$pi/180);                                
 // fill strengthBuffer and phaseWBuffer
-bandIndex = 1;
-loop(SIZE-1,
+bandIndex = 0;
+loop(SIZE,
 	bandIndex >= lowBin && bandIndex < highBin ?
 	(
 		// only set values for the appropriate frequency range
@@ -67,10 +72,11 @@ loop(SIZE-1,
 	
 	slider12 == 0 ?
 	(
-		windowBuffer[bandIndex] = 0.5 - 0.5 * cos(2*$pi*bandIndex/SIZE);
+		windowBuffer1[bandIndex] = 0.5 - 0.5 * cos(2*$pi*bandIndex/SIZE);
 	);
-	slider12 == 1 ? (
-		windowBuffer[bandIndex] = bandIndex < SIZE/2 ? (
+	slider12 == 1 ?
+	(
+		windowBuffer1[bandIndex] = bandIndex < SIZE/2 ? (
 			bandIndex / (SIZE/2-1)
 		) : (
 			(SIZE-bandIndex-1) / (SIZE/2-1)
@@ -78,22 +84,58 @@ loop(SIZE-1,
 	);
 	slider12 == 2 ?
 	(
-		windowBuffer[bandIndex] = sinc(2 * bandIndex / SIZE - 1);
+		windowBuffer1[bandIndex] = sinc(2 * bandIndex / SIZE - 1);
 	);
 	slider12 == 3 ?
 	(
 		cosIn = $pi * bandIndex / SIZE;
-		windowBuffer[bandIndex] = 0.35875 - 0.48829 * cos(2 * cosIn) + 0.14128 * cos(4 * cosIn) - 0.01168 * cos(6 * cosIn);
+		windowBuffer1[bandIndex] = 0.35875 - 0.48829 * cos(2 * cosIn) + 0.14128 * cos(4 * cosIn) - 0.01168 * cos(6 * cosIn);
 	);
 	slider12 == 4 ?
 	(
 		cosIn = $pi * bandIndex / SIZE;
-		windowBuffer[bandIndex] = 0.3635819 - 0.4891775 * cos(2 * cosIn) + 0.1365995 * cos(4 * cosIn) - 0.0106411 * cos(6 * cosIn);
+		windowBuffer1[bandIndex] = 0.3635819 - 0.4891775 * cos(2 * cosIn) + 0.1365995 * cos(4 * cosIn) - 0.0106411 * cos(6 * cosIn);
 	);
 	slider12 == 5 ?
 	(
 		cosIn = $pi * bandIndex / SIZE;
-		windowBuffer[bandIndex] = 0.355768 - 0.487396 * cos(2 * cosIn) + 0.144232 * cos(4 * cosIn) - 0.012604 * cos(6 * cosIn);
+		windowBuffer1[bandIndex] = 0.355768 - 0.487396 * cos(2 * cosIn) + 0.144232 * cos(4 * cosIn) - 0.012604 * cos(6 * cosIn);
+	);
+	
+	slider13 == 0 ?
+	(
+		windowBuffer2[bandIndex] = 1;
+	);
+	
+	slider13 == 1 ?
+	(
+		windowBuffer2[bandIndex] = 0.5 - 0.5 * cos(2*$pi*bandIndex/SIZE);
+	);
+	slider13 == 2 ? (
+		windowBuffer2[bandIndex] = bandIndex < SIZE/2 ? (
+			bandIndex / (SIZE/2-1)
+		) : (
+			(SIZE-bandIndex-1) / (SIZE/2-1)
+		);
+	);
+	slider13 == 3 ?
+	(
+		windowBuffer2[bandIndex] = sinc(2 * bandIndex / SIZE - 1);
+	);
+	slider13 == 4 ?
+	(
+		cosIn = $pi * bandIndex / SIZE;
+		windowBuffer2[bandIndex] = 0.35875 - 0.48829 * cos(2 * cosIn) + 0.14128 * cos(4 * cosIn) - 0.01168 * cos(6 * cosIn);
+	);
+	slider13 == 5 ?
+	(
+		cosIn = $pi * bandIndex / SIZE;
+		windowBuffer2[bandIndex] = 0.3635819 - 0.4891775 * cos(2 * cosIn) + 0.1365995 * cos(4 * cosIn) - 0.0106411 * cos(6 * cosIn);
+	);
+	slider13 == 6 ?
+	(
+		cosIn = $pi * bandIndex / SIZE;
+		windowBuffer2[bandIndex] = 0.355768 - 0.487396 * cos(2 * cosIn) + 0.144232 * cos(4 * cosIn) - 0.012604 * cos(6 * cosIn);
 	);
 	
 	bandIndex += 1;
@@ -110,22 +152,26 @@ SIZE = 8192;
 // to mute the first inital buffers
 silence = 2;
 
+
 // fft has real and complex values thus is twice as large
 bufferFFTIL = SIZE*0;
 bufferFFTIR = SIZE*2;
 bufferFFTO = SIZE*4;
-bufferL = SIZE*6;
-bufferI1L = SIZE*7;
-bufferI2L = SIZE*8;
-bufferR = SIZE*9;
-bufferI1R = SIZE*10;
-bufferI2R = SIZE*11;
+bufferI1L = SIZE*6;
+bufferI2L = SIZE*7;
+bufferDryL = SIZE*8;
+bufferI1R = SIZE*9;
+bufferI2R = SIZE*10;
+bufferDryR = SIZE*11;
 bufferO1C = SIZE*12;
 bufferO2C = SIZE*13;
 strengthBuffer = SIZE*14;
 phaseWBuffer = SIZE*15;
-windowBuffer = SIZE*16;
-freembuf(SIZE*17 + 1);
+windowBuffer1 = SIZE*16;
+windowBuffer2 = SIZE*17;
+inputbufL = SIZE*18;
+inputbufR = SIZE*18+8192;
+freembuf(SIZE*18+16384);
 
 // samplesCollected tracks the position in the last of the two tiles
 // ranges from 0 to (SIZE/2)-1
@@ -133,9 +179,12 @@ samplesCollected = 0;
 // offset ranges from 0 to SIZE-1
 offset = 0;
 
+// position in input buffer
+inPos = 0;
+
 // tell reaper what delay this plugin will introduce,
 // so that it can be compensated for
-pdc_delay = SIZE;
+pdc_delay = SIZE + slider15;
 // delay is one full buffer
 pdc_bot_ch = 0; pdc_top_ch = 2;
 // which channels are delayed
@@ -145,10 +194,22 @@ pdc_bot_ch = 0; pdc_top_ch = 2;
 
 
 @sample
+// store raw samples for later storing in input buffer
+firstL = spl0;
+firstR = spl1;
+
 // input corrections:
 // rotate stereo field to isloate different phases
-sampleLeft = cosine * spl0 - sine * spl1;
-sampleRight = sine * spl0 + cosine * spl1;
+// and read input from buffer
+slider15 == 0 ?
+(
+	sampleLeft = cosine * spl0 + sine * spl1;
+	sampleRight = - sine * spl0 + cosine * spl1;
+) : (
+	sampleLeft = cosine * inputbufL[inPos] + sine * inputbufR[inPos];
+	sampleRight =  - sine * inputbufL[inPos] + cosine * inputbufR[inPos];
+);
+
 // that's a lowercase L in spl, not the number 1.
 // spl0 corresponds to L, spl1 corresponds to R.
 
@@ -158,8 +219,8 @@ tilePos2 = samplesCollected;
 
 // apply the selected envelope while writing the sample into the tile buffer
 // See https://en.wikipedia.org/wiki/Window_function
-windowTile1 = windowBuffer[tilePos1];
-windowTile2 = windowBuffer[tilePos2];
+windowTile1 = windowBuffer1[tilePos1];
+windowTile2 = windowBuffer1[tilePos2];
 // windowTile2 has a relationship to the other window tile, so
 // it is epressed in this way for accuracy and speed
 
@@ -167,20 +228,24 @@ windowTile2 = windowBuffer[tilePos2];
 // if slider1 is less than two, the Left channel is present in the output
 // if slider1 is equal to 2, then the center channel is present in the output,
 // otherwise it is subtracted
-inL = bufferL[offset];
-inR = bufferR[offset];
-outC = bufferO1C[tilePos1] + bufferO2C[tilePos2];
-// if not hann window, account for how the two overlap positions
+dryL = bufferDryL[offset];
+dryR = bufferDryR[offset];
+outPart1 = bufferO1C[tilePos1] * windowBuffer2[tilePos1];
+outPart2 = bufferO2C[tilePos2] * windowBuffer2[tilePos2];
+outScale = windowBuffer1[tilePos1] * windowBuffer2[tilePos1] + windowBuffer1[tilePos2] * windowBuffer2[tilePos2];
+outC = (outPart1 + outPart2) / outScale;
+// account for how the two overlap positions
 // in the window don't add to 1
-slider12 > 1 ?
-(
-	outC /= (windowBuffer[tilePos1] + windowBuffer[tilePos2]);
-);
+
 centrePart = outC * centreMix;
-leftPart = inL * dryMix;
-rightPart = inR * dryMix;
+leftPart = dryL * dryMix;
+rightPart = dryR * dryMix;
 outL = leftPart + centrePart;
 outR = rightPart + centrePart;
+
+// write to dry buffers
+bufferDryL[offset] = sampleLeft;
+bufferDryR[offset] = sampleRight;
 
 // output audio, undoing rotation
 silence == 0 ? (
@@ -189,10 +254,13 @@ silence == 0 ? (
 		spl0 = outL;
 		spl1 = outR;
 	) : (
-		spl0 = outL * cosine + outR * sine;
-		spl1 = outR * cosine - outL * sine;
+		spl0 = outL * cosine - outR * sine;
+		spl1 = outR * cosine + outL * sine;
 	);
 ) : spl0 = spl1 = 0;
+
+inputbufL[inPos] = firstL;
+inputbufR[inPos] = firstR;
 
 // write to buffers:
 // Left + Right input buffers
@@ -201,17 +269,19 @@ bufferI2L[tilePos2] = sampleLeft * windowTile2;
 bufferI1R[tilePos1] = sampleRight * windowTile1;
 bufferI2R[tilePos2] = sampleRight * windowTile2;
 
-// set original L & R buffers
-bufferL[offset] = sampleLeft;
-bufferR[offset] = sampleRight;
-
 // increment positions
-offset += 1;
 samplesCollected += 1;
 
+offset += 1;
 offset == SIZE ?
 (
 	offset = 0;
+);
+
+inPos += 1;
+inPos >= slider15 ?
+(
+	inPos = 0;
 );
 
 // once we reach the end of a tile:
@@ -281,8 +351,9 @@ samplesCollected == SIZE/2 ?
 				normR = sqrt(sqr(Rreal) + sqr(Rimag));
 				normprod = normL * normR;
 				//sinval = (Lreal * Rimag - Limag * Rreal);
-				cosineval = (Lreal * Rreal + Limag * Rimag) / normprod;
-				uncapped = acos(cosineval) / phaseW;
+				cosineval = (Lreal * Rreal + Limag * Rimag) * cosine2 + (Limag * Rreal + Lreal * Rimag) * sine2;
+				cosnorm = cosineval / normprod;
+				uncapped = acos(cosnorm) / phaseW;
 				weight1 = min(1, uncapped);
 				weight2 = 1 - (weight1 ^ strength);
 				// attenuate if relative norms are very different, and option enabled
