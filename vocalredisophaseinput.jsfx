@@ -391,11 +391,12 @@ samplesCollected == HALFSIZE ?
 			fftOutRImag = newRimag
 		);
 
-		// divide by SIZE because fft adds that factor to input
-		bufferFFTOL[bandIndex * 2] = fftOutLReal / SIZE;
-		bufferFFTOL[bandIndex * 2 + 1] = fftOutLImag / SIZE;
-		bufferFFTOR[bandIndex * 2] = fftOutRReal / SIZE;
-		bufferFFTOR[bandIndex * 2 + 1] = fftOutRImag / SIZE;
+		// divide by SIZE because fft adds that factor to input,
+		// but mutliply by two because setting negative frequency bands to 0
+		bufferFFTOL[bandIndex * 2] = fftOutLReal / HALFSIZE;
+		bufferFFTOL[bandIndex * 2 + 1] = fftOutLImag / HALFSIZE;
+		bufferFFTOR[bandIndex * 2] = fftOutRReal / HALFSIZE;
+		bufferFFTOR[bandIndex * 2 + 1] = fftOutRImag / HALFSIZE;
 
 		bandIndex += 1;
 	);
