@@ -11,15 +11,14 @@ slider3:0<-5,5,0.001>strength at Low Cut
 slider4:0<-5,5,0.001>strength at High Cut
 slider5:80<0,24000>Low Cut (Vocals)
 slider6:24000<0,24000>High Cut (Vocals)
-slider7:0<-90,90,1>Phase (Degrees)
+slider7:0<-90,90,0.1>Phase (Degrees)
 slider8:90<1,180,0.1>Phase width at Low Cut (Degrees)
 slider9:90<1,180,0.1>Phase width at High Cut (Degrees)
 slider10:1<0,1,0.05>Attenuate if different volume
 slider11:1<0,1,1{No,Yes}>undo input corrections
 slider12:0<0,5,1{Hann,Triangular,Lanczos (sinc),Blackman-Harris,Blackman-Nutall,Nutall}>pre FFT window
 slider13:2<0,5,1{None,Hann,Triangular,Lanczos (sinc),Blackman-Harris,Blackman-Nutall,Nutall}>post FFT window
-slider14:0<-180,180,1>Phase2 (Degrees)
-slider15:0<0,8192,1>Input buffering (delay, reduce clicks)
+slider14:0<-180,180,0.05>Phase2 (Degrees)
 
 in_pin:left input
 in_pin:right input
@@ -77,15 +76,15 @@ loop(SIZE,
 	);
 	slider12 == 1 ?
 	(
-		windowBufferIn[bandIndex] = bandIndex < SIZE/2 ? (
-			bandIndex / (SIZE/2-1)
+		windowBufferIn[bandIndex] = bandIndex < HALFSIZE ? (
+			bandIndex / HALFSIZEMINUS1
 		) : (
-			(SIZE-bandIndex-1) / (SIZE/2-1)
+			(SIZE-bandIndex-1) / HALFSIZEMINUS1
 		);
 	);
 	slider12 == 2 ?
 	(
-		windowBufferIn[bandIndex] = sinc(2 * bandIndex / SIZE - 1);
+		windowBufferIn[bandIndex] = sinc(2 * bandIndex / SIZEMINUSONE);
 	);
 	slider12 == 3 ?
 	(
@@ -113,15 +112,15 @@ loop(SIZE,
 		windowBufferOut[bandIndex] = 0.5 - 0.5 * cos(2*$pi*bandIndex/SIZE);
 	);
 	slider13 == 2 ? (
-		windowBufferOut[bandIndex] = bandIndex < SIZE/2 ? (
-			bandIndex / (SIZE/2-1)
+		windowBufferOut[bandIndex] = bandIndex < HALFSIZE ? (
+			bandIndex / HALFSIZEMINUSONE
 		) : (
-			(SIZE-bandIndex-1) / (SIZE/2-1)
+			(SIZEMINUSONE-bandIndex) / HALFSIZEMINUSONE
 		);
 	);
 	slider13 == 3 ?
 	(
-		windowBufferOut[bandIndex] = sinc(2 * bandIndex / SIZE - 1);
+		windowBufferOut[bandIndex] = sinc(2 * bandIndex / SIZEMINUSONE);
 	);
 	slider13 == 4 ?
 	(
@@ -150,6 +149,10 @@ loop(SIZE,
 // buffers
 // FFT - fft window size (will be constant)
 SIZE = 8192;
+SIZEMINUSONE = SIZE-1;
+DOUBLESIZE = SIZE*2;
+HALFSIZE = SIZE/2;
+HALFSIZEMINUSONE = HALFSIZE-1;
 // track how many half frames of delay from the start we are
 // to mute the first inital buffers
 silence = 2;
@@ -158,10 +161,10 @@ silence = 2;
 // fft has real and complex values thus is twice as large
 // set each buffer to the offsef from the last to make it easier to move them around
 bufferFFTIL = 0;
-bufferFFTIR = bufferFFTIL+SIZE*2;
-bufferFFTOL = bufferFFTIR+SIZE*2;
-bufferFFTOR = bufferFFTOL+SIZE*2;
-bufferI1L = bufferFFTOR+SIZE*2;
+bufferFFTIR = bufferFFTIL+DOUBLESIZE;
+bufferFFTOL = bufferFFTIR+DOUBLESIZE;
+bufferFFTOR = bufferFFTOL+DOUBLESIZE;
+bufferI1L = bufferFFTOR+DOUBLESIZE;
 bufferI2L = bufferI1L+SIZE;
 bufferI1R = bufferI2L+SIZE;
 bufferI2R = bufferI1R+SIZE;
@@ -173,20 +176,16 @@ strengthBuffer = bufferO2R+SIZE;
 phaseWBuffer = strengthBuffer+SIZE;
 windowBufferIn = phaseWBuffer+SIZE;
 windowBufferOut = windowBufferIn+SIZE;
-inputbufL = windowBufferOut+SIZE;
-inputbufR = inputbufL+8192;
-freembuf(inputbufR+8192);
+freembuf(windowBufferOut+SIZE);
 
 // samplesCollected tracks the position in the last of the two tiles
 // ranges from 0 to (SIZE/2)-1
 samplesCollected = 0;
 
-// position in input buffer
-inPos = 0;
 
 // tell reaper what delay this plugin will introduce,
 // so that it can be compensated for
-pdc_delay = SIZE + slider15;
+pdc_delay = SIZE;
 // delay is one full buffer
 pdc_bot_ch = 0; pdc_top_ch = 2;
 // which channels are delayed
@@ -204,19 +203,12 @@ firstR = spl1;
 // spl0 corresponds to L, spl1 corresponds to R.
 
 // read input from buffers (or just read from spl if no buffering)
-slider15 == 0 ?
-(
-	sampleLeft = firstL;
-	sampleRight = firstR;
-) :
-(
-	sampleLeft = inputBufL[inPos];
-	sampleRight = inputBufR[inPos];
-);
 
+sampleLeft = firstL;
+sampleRight = firstR;
 
 // find positions in tile 1 and 2
-tilePos1 = samplesCollected + SIZE/2;
+tilePos1 = samplesCollected + HALFSIZE;
 tilePos2 = samplesCollected;
 
 // apply the selected envelope while writing the sample into the tile buffer
@@ -246,9 +238,7 @@ silence == 0 ? (
 	spl1 = outR;
 ) : spl0 = spl1 = 0;
 
-// write to input buffer
-inputbufL[inPos] = firstL;
-inputbufR[inPos] = firstR;
+
 
 // write to input tile buffers:
 // Left + Right input buffers
@@ -260,16 +250,8 @@ bufferI2R[tilePos2] = sampleRight * windowTile2;
 // increment positions
 samplesCollected += 1;
 
-// progress through input buffer
-inPos += 1;
-inPos >= slider15 ?
-(
-	// loop back to 0 when reached end
-	inPos = 0;
-);
-
 // once we reach the end of a tile:
-samplesCollected == SIZE/2 ?
+samplesCollected == HALFSIZE ?
 (
 	// make silence go to 0
 	silence > 0 ? silence -= 1;
@@ -320,7 +302,7 @@ samplesCollected == SIZE/2 ?
 	// that can be substracted from L&R
 	// we start off with the fft of the mid channel in the fftBuffer
 	bandIndex = 0;
-	loop(SIZE,
+	loop(HALFSIZE,
 		// get dry fft coefficeients
 		LrealDry = bufferFFTIL[bandIndex * 2];
 		LimagDry = bufferFFTIL[bandIndex * 2 + 1];
@@ -354,9 +336,6 @@ samplesCollected == SIZE/2 ?
 			normR = sqrt(sqr(Rreal) + sqr(Rimag));
 			normprod = normL * normR;
 			cosineval = Lreal * Rreal + Limag * Rimag;
-			//     (Lreal * Rreal + Limag * Rimag) * cosine2
-			//     + (Limag * Rreal + Lreal * Rimag) * sine2
-			//);
 			cosnorm = cosineval / normprod;
 			uncapped = acos(cosnorm) / phaseW;
 			weight1 = min(1, uncapped);
@@ -369,8 +348,8 @@ samplesCollected == SIZE/2 ?
 			centerImag = Limag + Rimag;
 			// isolate the mid fft (can just sum real and imaginary component
 			// since fft is a linear operator)
-			centerReal *= weight;
-			centerImag *= weight;
+			centerReal *= weight/2;
+			centerImag *= weight/2;
 
 			// calculate fft coefficients for this band
 			fftOutLReal = centerReal;
@@ -420,7 +399,10 @@ samplesCollected == SIZE/2 ?
 
 		bandIndex += 1;
 	);
-
+	
+	memset(bufferFFTOL+SIZE, 0, SIZE);
+	memset(bufferFFTOR+SIZE, 0, SIZE);
+	
 	// apply ifft to FFTOL
 	fft_ipermute(bufferFFTOL, SIZE);
 	ifft(bufferFFTOL, SIZE);
@@ -437,9 +419,7 @@ samplesCollected == SIZE/2 ?
 		index += 1; 
 	);
 
-
-
-	// Copy from the complex numbers in bufferFFTOL to the bufferO1L tile:
+	// Copy from the complex numbers in bufferFFTOR to the bufferO1R tile:
 	index = 0;
 	loop(SIZE,
 		// only take real part
