@@ -9,8 +9,8 @@ slider1:0<-100,100,0.1>dry mix
 slider2:0<-100,100,0.1>C mix (Vocals)
 slider3:0<-5,5,0.001>strength at Low Cut
 slider4:0<-5,5,0.001>strength at High Cut
-slider5:80<0,24000>Low Cut (Vocals)
-slider6:24000<0,24000>High Cut (Vocals)
+slider5:80<0,24000,10>Low Cut (Vocals)
+slider6:24000<0,24000,10>High Cut (Vocals)
 slider7:0<-90,90,0.1>Phase (Degrees)
 slider8:90<1,180,0.1>Phase width at Low Cut (Degrees)
 slider9:90<1,180,0.1>Phase width at High Cut (Degrees)
@@ -213,22 +213,24 @@ tilePos2 = samplesCollected;
 
 // apply the selected envelope while writing the sample into the tile buffer
 // See https://en.wikipedia.org/wiki/Window_function
-windowTile1 = windowBufferIn[tilePos1];
-windowTile2 = windowBufferIn[tilePos2];
+windowTileIn1 = windowBufferIn[tilePos1];
+windowTileIn2 = windowBufferIn[tilePos2];
+windowTileOut1 = windowBufferOut[tilePos1];
+windowTileOut2 = windowBufferOut[tilePos2];
 // windowTile2 has a relationship to the other window tile, so
 // it is epressed in this way for accuracy and speed
 
 
 // find scaling factor to undo scaling caused by windows
-outScale = windowBufferIn[tilePos1] * windowBufferOut[tilePos1] + windowBufferIn[tilePos2] * windowBufferOut[tilePos2];
+outScale = windowTileIn1 * windowTileOut1 + windowTileIn2 * windowTileOut2;
 
 // output samples
-outLPart1 = bufferO1L[tilePos1] * windowBufferOut[tilePos1];
-outLPart2 = bufferO2L[tilePos2] * windowBufferOut[tilePos2];
+outLPart1 = bufferO1L[tilePos1] * windowTileOut1;
+outLPart2 = bufferO2L[tilePos2] * windowTileOut2;
 outL = (outLPart1 + outLPart2) / outScale;
 
-outLPart1 = bufferO1R[tilePos1] * windowBufferOut[tilePos1];
-outLPart2 = bufferO2R[tilePos2] * windowBufferOut[tilePos2];
+outLPart1 = bufferO1R[tilePos1] * windowTileOut1;
+outLPart2 = bufferO2R[tilePos2] * windowTileOut2;
 outR = (outLPart1 + outLPart2) / outScale;
 
 
@@ -242,10 +244,10 @@ silence == 0 ? (
 
 // write to input tile buffers:
 // Left + Right input buffers
-bufferI1L[tilePos1] = sampleLeft * windowTile1;
-bufferI2L[tilePos2] = sampleLeft * windowTile2;
-bufferI1R[tilePos1] = sampleRight * windowTile1;
-bufferI2R[tilePos2] = sampleRight * windowTile2;
+bufferI1L[tilePos1] = sampleLeft * windowTileIn1;
+bufferI2L[tilePos2] = sampleLeft * windowTileIn2;
+bufferI1R[tilePos1] = sampleRight * windowTileIn1;
+bufferI2R[tilePos2] = sampleRight * windowTileIn2;
 
 // increment positions
 samplesCollected += 1;
@@ -262,11 +264,11 @@ samplesCollected == HALFSIZE ?
 	// Loop over each of the audio samples, from index = 0 to SIZE - 1.
 	index = 0;
 	loop(SIZE,
-		bufferFFTIL[2 * index + 0] = bufferI1L[index];
+		bufferFFTIL[index] = bufferI1L[index] / SIZE;
 		// Real part
-		bufferFFTIL[2 * index + 1] = 0.0;
+		bufferFFTIL[index + 1] = 0.0;
 		// Imaginary part
-		index += 1;
+		index += 2;
 		// Next index
 	);
 	// calculate fft in place
@@ -281,11 +283,11 @@ samplesCollected == HALFSIZE ?
 	// Loop over each of the audio samples, from index = 0 to SIZE - 1.
 	index = 0;
 	loop(SIZE,
-		bufferFFTIR[2 * index + 0] = bufferI1R[index];
+		bufferFFTIR[index] = bufferI1R[index] / SIZE;
 		// Real part
-		bufferFFTIR[2 * index + 1] = 0.0;
+		bufferFFTIR[index + 1] = 0.0;
 		// Imaginary part
-		index += 1;
+		index += 2;
 		// Next index
 	);
 	// calculate fft in place
@@ -301,29 +303,26 @@ samplesCollected == HALFSIZE ?
 	// Make a weighted center (mono with respect to phase)
 	// that can be substracted from L&R
 	// we start off with the fft of the mid channel in the fftBuffer
+	realIndex = 0;
+	imagIndex = 1;
 	bandIndex = 0;
 	loop(HALFSIZE,
 		// get dry fft coefficeients
-		LrealDry = bufferFFTIL[bandIndex * 2];
-		LimagDry = bufferFFTIL[bandIndex * 2 + 1];
-		RrealDry = bufferFFTIR[bandIndex * 2];
-		RimagDry = bufferFFTIR[bandIndex * 2 + 1];
+		LrealRaw = bufferFFTIL[realIndex];
+		LimagRaw = bufferFFTIL[imagIndex];
+		RrealRaw = bufferFFTIR[realIndex];
+		RimagRaw = bufferFFTIR[imagIndex];
 		
 		// input corrections
 		// first, change the phase of L based on phase2:
-		Lreal = LrealDry*cosine2 + LimagDry*sine2;
-		Limag = LimagDry*cosine2 - LrealDry*sine2;
+		Lreal = LrealRaw*cosine2 + LimagRaw*sine2;
+		Limag = LimagRaw*cosine2 - LrealRaw*sine2;
 
 		// now mix L&R together based on phase
-		Rreal = RrealDry*cosine + Lreal*sine;
-		Rimag = RimagDry*cosine + Limag*sine;
-		Lreal = Lreal*cosine - RrealDry*sine;
-		Limag = Limag*cosine - RimagDry*sine;
-
-		LrealDry = Lreal;
-		LimagDry = Limag;
-		RrealDry = Rreal;
-		RimagDry = Rimag;
+		RrealDry = RrealRaw*cosine + Lreal*sine;
+		RimagDry = RimagRaw*cosine + Limag*sine;
+		LrealDry = Lreal*cosine - RrealRaw*sine;
+		LimagDry = Limag*cosine - RimagRaw*sine;
 		
 		bandIndex >= lowBin && bandIndex < highBin ?
 		(
@@ -332,31 +331,25 @@ samplesCollected == HALFSIZE ?
 			// get strength
 			phaseW = phaseWBuffer[bandIndex];
 			// get phase width
-			normL = sqrt(sqr(Lreal) + sqr(Limag));
-			normR = sqrt(sqr(Rreal) + sqr(Rimag));
-			normprod = normL * normR;
-			cosineval = Lreal * Rreal + Limag * Rimag;
-			cosnorm = cosineval / normprod;
-			uncapped = acos(cosnorm) / phaseW;
-			weight1 = min(1, uncapped);
-			weight2 = 1 - (weight1 ^ strength);
-			// attenuate if relative norms are very different, and option enabled
-			atten = 1 - (sqr(normL - normR)/sqr(normL + normR));
-			weight = weight2 * atten ^ (strength * slider10);
+			normL = sqrt(sqr(LrealDry) + sqr(LimagDry));
+			normR = sqrt(sqr(RrealDry) + sqr(RimagDry));
+			weight = (
+				1 - (
+					min(
+						1,
+						acos(
+							(LrealDry * RrealDry + LimagDry * RimagDry) / (normL * normR)
+						) / phaseW
+					) ^ strength
+				)
+			) * (
+				1 - (sqr(normL - normR)/sqr(normL + normR))
+			) ^ (strength * slider10) / 2;
 
-			centerReal = Lreal + Rreal;
-			centerImag = Limag + Rimag;
+			centerReal = (LrealDry + RrealDry) * weight;
+			centerImag = (LimagDry + RimagDry) * weight;
 			// isolate the mid fft (can just sum real and imaginary component
 			// since fft is a linear operator)
-			centerReal *= weight/2;
-			centerImag *= weight/2;
-
-			// calculate fft coefficients for this band
-			fftOutLReal = centerReal;
-			fftOutLImag = centerImag;
-			fftOutRReal = centerReal;
-			fftOutRImag = centerImag;
-
 		) : (
 			// let wet signal have 0 for fft coefficients when out of bounds
 			fftOutLReal = 0;
@@ -366,38 +359,32 @@ samplesCollected == HALFSIZE ?
 		);
 
 		// apply wet dry mix
-		fftOutLReal = LrealDry * dryMix + fftOutLReal * wetMix;
-		fftOutLImag = LimagDry * dryMix + fftOutLImag * wetMix;
-		fftOutRReal = RrealDry * dryMix + fftOutRReal * wetMix;
-		fftOutRImag = RimagDry * dryMix + fftOutRImag * wetMix;
+		fftOutLReal = LrealDry * dryMix + centerReal * wetMix;
+		fftOutLImag = LimagDry * dryMix + centerImag * wetMix;
+		fftOutRReal = RrealDry * dryMix + centerReal * wetMix;
+		fftOutRImag = RimagDry * dryMix + centerImag * wetMix;
 
 		// apply reverse of input corrections
 		slider11 != 0 ? (
-			
-			// TODO: fix this
-			newRreal = fftOutRReal*cosine - fftOutLReal*sine;
-			newRimag = fftOutRImag*cosine - fftOutLImag*sine;
+			// unmix L & R
+			fftOutRReal = fftOutRReal*cosine - fftOutLReal*sine;
+			fftOutRImag = fftOutRImag*cosine - fftOutLImag*sine;
 			newLreal = fftOutLReal*cosine + fftOutRReal*sine;
 			newLimag = fftOutLImag*cosine + fftOutRImag*sine;
 			
-			Lreal = newLreal;
-			Limag = newLimag;
-			newLreal = Lreal*cosine2 - Limag*sine2;
-			newLimag = Limag*cosine2 + Lreal*sine2;
-			
-			fftOutLReal = newLReal;
-			fftOutLImag = newLImag;
-			fftOutRReal = newRReal;
-			fftOutRImag = newRimag
+			// revert phase change to L
+			fftOutLReal = newLreal*cosine2 - newLimag*sine2;
+			fftOutLImag =newLimag*cosine2 + newLreal*sine2;
 		);
 
-		// divide by SIZE because fft adds that factor to input,
-		// but mutliply by two because setting negative frequency bands to 0
-		bufferFFTOL[bandIndex * 2] = fftOutLReal / HALFSIZE;
-		bufferFFTOL[bandIndex * 2 + 1] = fftOutLImag / HALFSIZE;
-		bufferFFTOR[bandIndex * 2] = fftOutRReal / HALFSIZE;
-		bufferFFTOR[bandIndex * 2 + 1] = fftOutRImag / HALFSIZE;
+		// copy to ouput buffers
+		bufferFFTOL[realIndex] = fftOutLReal;
+		bufferFFTOL[imagIndex] = fftOutLImag;
+		bufferFFTOR[realIndex] = fftOutRReal;
+		bufferFFTOR[imagIndex] = fftOutRImag;
 
+		realIndex += 2;
+		imagIndex += 2;
 		bandIndex += 1;
 	);
 	
@@ -416,16 +403,16 @@ samplesCollected == HALFSIZE ?
 	index = 0;
 	loop(SIZE,
 		// only take real part
-		bufferO1L[index] = bufferFFTOL[2 * index];
-		index += 1; 
+		bufferO1L[index] = bufferFFTOL[index];
+		index += 2; 
 	);
 
 	// Copy from the complex numbers in bufferFFTOR to the bufferO1R tile:
 	index = 0;
 	loop(SIZE,
 		// only take real part
-		bufferO1R[index] = bufferFFTOR[2 * index];
-		index += 1;
+		bufferO1R[index] = bufferFFTOR[index];
+		index += 2;
 	);
 
 	temp = bufferI1L;
