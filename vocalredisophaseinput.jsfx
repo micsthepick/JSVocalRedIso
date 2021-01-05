@@ -264,9 +264,9 @@ samplesCollected == HALFSIZE ?
 	// Loop over each of the audio samples, from index = 0 to SIZE - 1.
 	index = 0;
 	loop(SIZE,
-		bufferFFTIL[index + index] = bufferI1L[index] / SIZE;
+		bufferFFTIL[index*2] = bufferI1L[index] / SIZE;
 		// Real part
-		bufferFFTIL[index + index + 1] = 0.0;
+		bufferFFTIL[index*2 + 1] = 0.0;
 		// Imaginary part
 		index += 1;
 		// Next index
@@ -283,9 +283,9 @@ samplesCollected == HALFSIZE ?
 	// Loop over each of the audio samples, from index = 0 to SIZE - 1.
 	index = 0;
 	loop(SIZE,
-		bufferFFTIR[index + index] = bufferI1R[index] / SIZE;
+		bufferFFTIR[index*2] = bufferI1R[index] / SIZE;
 		// Real part
-		bufferFFTIR[index + index + 1] = 0.0;
+		bufferFFTIR[index*2 + 1] = 0.0;
 		// Imaginary part
 		index += 1;
 		// Next index
@@ -403,7 +403,7 @@ samplesCollected == HALFSIZE ?
 	index = 0;
 	loop(SIZE,
 		// only take real part
-		bufferO1L[index] = bufferFFTOL[index + index];
+		bufferO1L[index] = bufferFFTOL[index*2];
 		index += 1;
 	);
 
@@ -411,7 +411,7 @@ samplesCollected == HALFSIZE ?
 	index = 0;
 	loop(SIZE,
 		// only take real part
-		bufferO1R[index] = bufferFFTOR[index + index];
+		bufferO1R[index] = bufferFFTOR[index*2];
 		index += 1;
 	);
 
