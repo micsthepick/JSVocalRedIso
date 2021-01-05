@@ -229,9 +229,9 @@ outLPart1 = bufferO1L[tilePos1] * windowTileOut1;
 outLPart2 = bufferO2L[tilePos2] * windowTileOut2;
 outL = (outLPart1 + outLPart2) / outScale;
 
-outLPart1 = bufferO1R[tilePos1] * windowTileOut1;
-outLPart2 = bufferO2R[tilePos2] * windowTileOut2;
-outR = (outLPart1 + outLPart2) / outScale;
+outRPart1 = bufferO1R[tilePos1] * windowTileOut1;
+outRPart2 = bufferO2R[tilePos2] * windowTileOut2;
+outR = (outRPart1 + outRPart2) / outScale;
 
 
 // output audio
@@ -264,11 +264,11 @@ samplesCollected == HALFSIZE ?
 	// Loop over each of the audio samples, from index = 0 to SIZE - 1.
 	index = 0;
 	loop(SIZE,
-		bufferFFTIL[index] = bufferI1L[index] / SIZE;
+		bufferFFTIL[index + index] = bufferI1L[index] / SIZE;
 		// Real part
-		bufferFFTIL[index + 1] = 0.0;
+		bufferFFTIL[index + index + 1] = 0.0;
 		// Imaginary part
-		index += 2;
+		index += 1;
 		// Next index
 	);
 	// calculate fft in place
@@ -283,11 +283,11 @@ samplesCollected == HALFSIZE ?
 	// Loop over each of the audio samples, from index = 0 to SIZE - 1.
 	index = 0;
 	loop(SIZE,
-		bufferFFTIR[index] = bufferI1R[index] / SIZE;
+		bufferFFTIR[index + index] = bufferI1R[index] / SIZE;
 		// Real part
-		bufferFFTIR[index + 1] = 0.0;
+		bufferFFTIR[index + index + 1] = 0.0;
 		// Imaginary part
-		index += 2;
+		index += 1;
 		// Next index
 	);
 	// calculate fft in place
@@ -374,7 +374,7 @@ samplesCollected == HALFSIZE ?
 			
 			// revert phase change to L
 			fftOutLReal = newLreal*cosine2 - newLimag*sine2;
-			fftOutLImag =newLimag*cosine2 + newLreal*sine2;
+			fftOutLImag = newLimag*cosine2 + newLreal*sine2;
 		);
 
 		// copy to ouput buffers
@@ -403,16 +403,16 @@ samplesCollected == HALFSIZE ?
 	index = 0;
 	loop(SIZE,
 		// only take real part
-		bufferO1L[index] = bufferFFTOL[index];
-		index += 2; 
+		bufferO1L[index] = bufferFFTOL[index + index];
+		index += 1;
 	);
 
 	// Copy from the complex numbers in bufferFFTOR to the bufferO1R tile:
 	index = 0;
 	loop(SIZE,
 		// only take real part
-		bufferO1R[index] = bufferFFTOR[index];
-		index += 2;
+		bufferO1R[index] = bufferFFTOR[index + index];
+		index += 1;
 	);
 
 	temp = bufferI1L;
