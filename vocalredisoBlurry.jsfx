@@ -231,14 +231,10 @@ samplesCollected == HALFSIZE ?
 	fft_permute(bufferFFTIR, SIZE);
 
 
-	// Compute center:
-	// Make a weighted center (mono with respect to phase)
-	// that can be substracted from L&R
-	// we start off with the fft of the mid channel in the fftBuffer
+	
 	realIndex = 0;
 	imagIndex = 1;
 	bandIndex = 0;
-	
 	loop(HALFSIZE,
 		// get dry fft coefficeients
 		LrealRaw = bufferFFTIL[realIndex];
@@ -292,6 +288,9 @@ samplesCollected == HALFSIZE ?
 		bandIndex += 1;
 	);
 	
+	
+	realIndex = 0;
+	imagIndex = 1;
 	bandIndex = 0;
 	loop(HALFSIZE,	
 		LrealDry = bufferFFTOL[realIndex];
@@ -352,10 +351,7 @@ samplesCollected == HALFSIZE ?
 		realIndex += 2;
 		imagIndex += 2;
 		bandIndex += 1;
-      );
-      
-      tileO1[bandIndex] *= attenuationFactor / elems;
-	);
+    );
 	
 	memset(bufferFFTOL+SIZE, 0, SIZE);
 	memset(bufferFFTOR+SIZE, 0, SIZE);
