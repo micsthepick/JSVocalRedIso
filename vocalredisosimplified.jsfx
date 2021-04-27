@@ -295,10 +295,10 @@ samplesCollected == HALFSIZE ?
 		// apply reverse of input corrections
 		slider11 != 0 ? (
 			// unmix L & R
-			fftOutRReal = fftOutRReal*cosine - fftOutLReal*sine;
-			fftOutRImag = fftOutRImag*cosine - fftOutLImag*sine;
 			newLreal = fftOutLReal*cosine + fftOutRReal*sine;
 			newLimag = fftOutLImag*cosine + fftOutRImag*sine;
+			fftOutRReal = fftOutRReal*cosine - fftOutLReal*sine;
+			fftOutRImag = fftOutRImag*cosine - fftOutLImag*sine;
 			
 			// revert phase change to L
 			fftOutLReal = newLreal*cosine2 - newLimag*sine2;

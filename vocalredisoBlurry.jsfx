@@ -30,8 +30,8 @@ out_pin:right output
 // calculate sinc, handling 0 as the limiting value
 function sinc(x)
 (
-	sincIn = $pi * x;
-	sincIn == 0 ? 1 : sin(sincIn) / sincIn;
+  sincIn = $pi * x;
+  sincIn == 0 ? 1 : sin(sincIn) / sincIn;
 );
 
 // convert low cut and high cut to bins every time a slider is changed
@@ -53,24 +53,24 @@ sine2 = sin(slider12*$pi/180);
 // fill strengthBuffer and phaseWBuffer
 bandIndex = 0;
 loop(SIZE,
-	bandIndex >= lowBin && bandIndex < highBin ?
-	(
-		// only set values for the appropriate frequency range
-		frac = (bandIndex - lowBin)/(highBin - lowBin - 1);
-		frac = max(0, min(1, frac));
-		// fraction of progress through range [lowBin, highBin)
-		strength = lowStrength* (1 - frac) + highStrength * frac;
-		strengthBuffer[bandIndex] = 10^strength;
-		// precaculate strength (actual value should be positive, so it makes
-		// sense to take the power of ten, but only after the
-		// linear mapping over the spectrum is done.
-		phaseW = phaseWlow * (1 - frac) + phaseWhigh * frac;
-		phaseWBuffer[bandIndex] = phaseW;
-		// precalculate phase width
-	);
+  bandIndex >= lowBin && bandIndex < highBin ?
+  (
+    // only set values for the appropriate frequency range
+    frac = (bandIndex - lowBin)/(highBin - lowBin - 1);
+    frac = max(0, min(1, frac));
+    // fraction of progress through range [lowBin, highBin)
+    strength = lowStrength* (1 - frac) + highStrength * frac;
+    strengthBuffer[bandIndex] = 10^strength;
+    // precaculate strength (actual value should be positive, so it makes
+    // sense to take the power of ten, but only after the
+    // linear mapping over the spectrum is done.
+    phaseW = phaseWlow * (1 - frac) + phaseWhigh * frac;
+    phaseWBuffer[bandIndex] = phaseW;
+    // precalculate phase width
+  );
 
-	bandIndex += 1;
-	// next index
+  bandIndex += 1;
+  // next index
 );
 
 
@@ -79,7 +79,7 @@ loop(SIZE,
 // init variables
 // buffers
 // FFT - fft window size (will be constant)
-SIZE = 8192;
+SIZE = 16384;//32768;
 SIZEMINUSONE = SIZE-1;
 DOUBLESIZE = SIZE*2;
 HALFSIZE = SIZE/2;
@@ -124,9 +124,9 @@ pdc_bot_ch = 0; pdc_top_ch = 2;
 
 // fill windowBuffer
 loop(SIZE,
-	windowBuffer[bandIndex] = sin((bandIndex+1/2)*$pi/SIZE);
+  windowBuffer[bandIndex] = sin((bandIndex+1/2)*$pi/SIZE);
 
-	bandIndex += 1;
+  bandIndex += 1;
 );
 
 
@@ -168,8 +168,8 @@ outR = (outRPart1 + outRPart2);// / outScale;
 
 // output audio
 silence == 0 ? (
-	spl0 = outL;
-	spl1 = outR;
+  spl0 = outL;
+  spl1 = outR;
 ) : spl0 = spl1 = 0;
 
 
@@ -187,214 +187,214 @@ samplesCollected += 1;
 // once we reach the end of a tile:
 samplesCollected == HALFSIZE ?
 (
-	// make silence go to 0
-	silence > 0 ? silence -= 1;
-	samplesCollected = 0;
-	// wrap back to 0 on the tile
+  // make silence go to 0
+  silence > 0 ? silence -= 1;
+  samplesCollected = 0;
+  // wrap back to 0 on the tile
 
-	// calculate fft for left channel
-	// Loop over each of the audio samples, from index = 0 to SIZE - 1.
-	index = 0;
-	loop(SIZE,
-		bufferFFTIL[index*2] = bufferI1L[index] / HALFSIZE;
-		// Real part
-		bufferFFTIL[index*2 + 1] = 0.0;
-		// Imaginary part
-		index += 1;
-		// Next index
-	);
-	// calculate fft in place
-	// size specifies the number of bins
-	// (one complex number for each bin)
-	fft(bufferFFTIL, SIZE);
-	// need to permute the frequency bins to get them in the right order
-	// See https://www.reaper.fm/sdk/js/advfunc.php#js_advanced for more info.
-	fft_permute(bufferFFTIL, SIZE);
+  // calculate fft for left channel
+  // Loop over each of the audio samples, from index = 0 to SIZE - 1.
+  index = 0;
+  loop(SIZE,
+    bufferFFTIL[index*2] = bufferI1L[index] / HALFSIZE;
+    // Real part
+    bufferFFTIL[index*2 + 1] = 0.0;
+    // Imaginary part
+    index += 1;
+    // Next index
+  );
+  // calculate fft in place
+  // size specifies the number of bins
+  // (one complex number for each bin)
+  fft(bufferFFTIL, SIZE);
+  // need to permute the frequency bins to get them in the right order
+  // See https://www.reaper.fm/sdk/js/advfunc.php#js_advanced for more info.
+  fft_permute(bufferFFTIL, SIZE);
 
-	// calculate fft for right channel
-	// Loop over each of the audio samples, from index = 0 to SIZE - 1.
-	index = 0;
-	loop(SIZE,
-		bufferFFTIR[index*2] = bufferI1R[index] / HALFSIZE;
-		// Real part
-		bufferFFTIR[index*2 + 1] = 0.0;
-		// Imaginary part
-		index += 1;
-		// Next index
-	);
-	// calculate fft in place
-	// size specifies the number of bins
-	// (one complex number for each bin)
-	fft(bufferFFTIR, SIZE);
-	// need to permute the frequency bins to get them in the right order
-	// See https://www.reaper.fm/sdk/js/advfunc.php#js_advanced for more info.
-	fft_permute(bufferFFTIR, SIZE);
-
-
-	
-	realIndex = 0;
-	imagIndex = 1;
-	bandIndex = 0;
-	loop(HALFSIZE,
-		// get dry fft coefficeients
-		LrealRaw = bufferFFTIL[realIndex];
-		LimagRaw = bufferFFTIL[imagIndex];
-		RrealRaw = bufferFFTIR[realIndex];
-		RimagRaw = bufferFFTIR[imagIndex];
-		
-		// input corrections
-		// first, change the phase of L based on phase2:
-		Lreal = LrealRaw*cosine2 + LimagRaw*sine2;
-		Limag = LimagRaw*cosine2 - LrealRaw*sine2;
-
-		// now mix L&R together based on phase
-		RrealDry = RrealRaw*cosine + Lreal*sine;
-		RimagDry = RimagRaw*cosine + Limag*sine;
-		LrealDry = Lreal*cosine - RrealRaw*sine;
-		LimagDry = Limag*cosine - RimagRaw*sine;
-		
-		// apply  vocal reduction algorithm only in the right bands
-		strength = strengthBuffer[bandIndex];
-		// get strength
-		phaseW = phaseWBuffer[bandIndex];
-		// get phase width
-		normL = sqrt(sqr(LrealDry) + sqr(LimagDry));
-		normR = sqrt(sqr(RrealDry) + sqr(RimagDry));
-		weight = (
-			1 - (
-				min(
-					1,
-					acos(
-						(LrealDry * RrealDry + LimagDry * RimagDry) / (normL * normR)
-					) / phaseW
-				) ^ strength
-			)
-		) * (
-			1 - (sqr(normL - normR)/sqr(normL + normR))
-		) ^ (strength * slider10) / 2;
-		
-		blurringBuffer[bandIndex] = weight;
-		
-		bufferFFTOL[realIndex] = LrealDry;
-		bufferFFTOL[imagIndex] = LimagDry;
-		bufferFFTOR[realIndex] = RrealDry;
-        bufferFFTOR[imagIndex] = RimagDry;
+  // calculate fft for right channel
+  // Loop over each of the audio samples, from index = 0 to SIZE - 1.
+  index = 0;
+  loop(SIZE,
+    bufferFFTIR[index*2] = bufferI1R[index] / HALFSIZE;
+    // Real part
+    bufferFFTIR[index*2 + 1] = 0.0;
+    // Imaginary part
+    index += 1;
+    // Next index
+  );
+  // calculate fft in place
+  // size specifies the number of bins
+  // (one complex number for each bin)
+  fft(bufferFFTIR, SIZE);
+  // need to permute the frequency bins to get them in the right order
+  // See https://www.reaper.fm/sdk/js/advfunc.php#js_advanced for more info.
+  fft_permute(bufferFFTIR, SIZE);
 
 
+  
+  realIndex = 0;
+  imagIndex = 1;
+  bandIndex = 0;
+  loop(HALFSIZE,
+    // get dry fft coefficeients
+    LrealRaw = bufferFFTIL[realIndex];
+    LimagRaw = bufferFFTIL[imagIndex];
+    RrealRaw = bufferFFTIR[realIndex];
+    RimagRaw = bufferFFTIR[imagIndex];
+    
+    // input corrections
+    // first, change the phase of L based on phase2:
+    Lreal = LrealRaw*cosine2 + LimagRaw*sine2;
+    Limag = LimagRaw*cosine2 - LrealRaw*sine2;
+
+    // now mix L&R together based on phase
+    RrealDry = RrealRaw*cosine + Lreal*sine;
+    RimagDry = RimagRaw*cosine + Limag*sine;
+    LrealDry = Lreal*cosine - RrealRaw*sine;
+    LimagDry = Limag*cosine - RimagRaw*sine;
+    
+    // apply  vocal reduction algorithm only in the right bands
+    strength = strengthBuffer[bandIndex];
+    // get strength
+    phaseW = phaseWBuffer[bandIndex];
+    // get phase width
+    normL = sqrt(sqr(LrealDry) + sqr(LimagDry));
+    normR = sqrt(sqr(RrealDry) + sqr(RimagDry));
+    weight = (
+      1 - (
+        min(
+          1,
+          acos(
+            (LrealDry * RrealDry + LimagDry * RimagDry) / (normL * normR)
+          ) / phaseW
+        ) ^ strength
+      )
+    ) * (
+      1 - (sqr(normL - normR)/sqr(normL + normR))
+    ) ^ (strength * slider10) / 2;
+    
+    blurringBuffer[bandIndex] = weight;
+    
+    bufferFFTOL[realIndex] = LrealDry;
+    bufferFFTOL[imagIndex] = LimagDry;
+    bufferFFTOR[realIndex] = RrealDry;
+    bufferFFTOR[imagIndex] = RimagDry;
 
 
-		realIndex += 2;
-		imagIndex += 2;
-		bandIndex += 1;
-	);
-	
-	
-	realIndex = 0;
-	imagIndex = 1;
-	bandIndex = 0;
-	loop(HALFSIZE,	
-		LrealDry = bufferFFTOL[realIndex];
-		LimagDry = bufferFFTOL[imagIndex];
-		RrealDry = bufferFFTOR[realIndex];
-        RimagDry = bufferFFTOR[imagIndex];
-	
-		bandIndex >= lowBin && bandIndex < highBin ?
-		(
-			// Find the blurred attenuation factor for this coefficient
-			// find out how much to blur by in this 
-			blurAmount = (slider7*log(1+bandIndex))~0;
-			attenuationFactor = 0;//blurringBuffer[bandIndex];
-			divisor = 1;
-			
-			index = max(0, bandIndex-indexOffset);
-			maxIndex = min(SIZE/2-1, bandIndex+indexOffset);
-			elems = maxIndex - index + 1;
-			loop(elems,
-				attenuationFactor += blurringBuffer[index];
-			);
-			weight = attenuationFactor / elems;
-		
-			centerReal = (LrealDry + RrealDry) * weight;
-			centerImag = (LimagDry + RimagDry) * weight;
-		) : (
-			// let wet signal have 0 for fft coefficients when out of bounds
-			centerReal  = 0;
-			centerImag  = 0;
-		);
-		
-		
-		// apply wet dry mix
-		fftOutLReal = LrealDry * dryMix + centerReal * wetMix;
-		fftOutLImag = LimagDry * dryMix + centerImag * wetMix;
-		fftOutRReal = RrealDry * dryMix + centerReal * wetMix;
-		fftOutRImag = RimagDry * dryMix + centerImag * wetMix;
-		
-		// reverse input corrections
-		slider11 != 0 ? (
-			// unmix L & R
-			fftOutRReal = fftOutRReal*cosine - fftOutLReal*sine;
-			fftOutRImag = fftOutRImag*cosine - fftOutLImag*sine;
-			newLreal = fftOutLReal*cosine + fftOutRReal*sine;
-			newLimag = fftOutLImag*cosine + fftOutRImag*sine;
-			
-			// revert phase change to L
-			fftOutLReal = newLreal*cosine2 - newLimag*sine2;
-			fftOutLImag = newLimag*cosine2 + newLreal*sine2;
-		);
-		
-		// copy to ouput buffers
-		bufferFFTOL[realIndex] = fftOutLReal;
-		bufferFFTOL[imagIndex] = fftOutLImag;
-		bufferFFTOR[realIndex] = fftOutRReal;
-		bufferFFTOR[imagIndex] = fftOutRImag;
-		
-		realIndex += 2;
-		imagIndex += 2;
-		bandIndex += 1;
+
+
+    realIndex += 2;
+    imagIndex += 2;
+    bandIndex += 1;
+  );
+  
+  
+  realIndex = 0;
+  imagIndex = 1;
+  bandIndex = 0;
+  loop(HALFSIZE,  
+    LrealDry = bufferFFTOL[realIndex];
+    LimagDry = bufferFFTOL[imagIndex];
+    RrealDry = bufferFFTOR[realIndex];
+    RimagDry = bufferFFTOR[imagIndex];
+  
+    bandIndex >= lowBin && bandIndex < highBin ?
+    (
+      // Find the blurred attenuation factor for this coefficient
+      // find out how much to blur by in this 
+      blurAmount = (slider7*log(1+bandIndex))~0;
+      attenuationFactor = 0;//blurringBuffer[bandIndex];
+      divisor = 1;
+      
+      index = max(0, bandIndex-indexOffset);
+      maxIndex = min(SIZE/2-1, bandIndex+indexOffset);
+      elems = maxIndex - index + 1;
+      loop(elems,
+        attenuationFactor += blurringBuffer[index];
+      );
+      weight = attenuationFactor / elems;
+    
+      centerReal = (LrealDry + RrealDry) * weight;
+      centerImag = (LimagDry + RimagDry) * weight;
+    ) : (
+      // let wet signal have 0 for fft coefficients when out of bounds
+      centerReal  = 0;
+      centerImag  = 0;
     );
-	
-	memset(bufferFFTOL+SIZE, 0, SIZE);
-	memset(bufferFFTOR+SIZE, 0, SIZE);
-	
-	// apply ifft to FFTOL
-	fft_ipermute(bufferFFTOL, SIZE);
-	ifft(bufferFFTOL, SIZE);
+    
+    
+    // apply wet dry mix
+    fftOutLReal = LrealDry * dryMix + centerReal * wetMix;
+    fftOutLImag = LimagDry * dryMix + centerImag * wetMix;
+    fftOutRReal = RrealDry * dryMix + centerReal * wetMix;
+    fftOutRImag = RimagDry * dryMix + centerImag * wetMix;
+    
+    // reverse input corrections
+    slider11 != 0 ? (
+      // unmix L & R
+      newLreal = fftOutLReal*cosine + fftOutRReal*sine;
+      newLimag = fftOutLImag*cosine + fftOutRImag*sine;
+      fftOutRReal = fftOutRReal*cosine - fftOutLReal*sine;
+      fftOutRImag = fftOutRImag*cosine - fftOutLImag*sine;
+      
+      // revert phase change to L
+      fftOutLReal = newLreal*cosine2 - newLimag*sine2;
+      fftOutLImag = newLimag*cosine2 + newLreal*sine2;
+    );
+    
+    // copy to ouput buffers
+    bufferFFTOL[realIndex] = fftOutLReal;
+    bufferFFTOL[imagIndex] = fftOutLImag;
+    bufferFFTOR[realIndex] = fftOutRReal;
+    bufferFFTOR[imagIndex] = fftOutRImag;
+    
+    realIndex += 2;
+    imagIndex += 2;
+    bandIndex += 1;
+    );
+  
+  memset(bufferFFTOL+SIZE, 0, SIZE);
+  memset(bufferFFTOR+SIZE, 0, SIZE);
+  
+  // apply ifft to FFTOL
+  fft_ipermute(bufferFFTOL, SIZE);
+  ifft(bufferFFTOL, SIZE);
 
-	// apply ifft to FFTOR
-	fft_ipermute(bufferFFTOR, SIZE);
-	ifft(bufferFFTOR, SIZE);
+  // apply ifft to FFTOR
+  fft_ipermute(bufferFFTOR, SIZE);
+  ifft(bufferFFTOR, SIZE);
 
-	// Copy from the complex numbers in bufferFFTOL to the bufferO1L tile:
-	index = 0;
-	loop(SIZE,
-		// only take real part
-		bufferO1L[index] = bufferFFTOL[index*2];
-		index += 1;
-	);
+  // Copy from the complex numbers in bufferFFTOL to the bufferO1L tile:
+  index = 0;
+  loop(SIZE,
+    // only take real part
+    bufferO1L[index] = bufferFFTOL[index*2];
+    index += 1;
+  );
 
-	// Copy from the complex numbers in bufferFFTOR to the bufferO1R tile:
-	index = 0;
-	loop(SIZE,
-		// only take real part
-		bufferO1R[index] = bufferFFTOR[index*2];
-		index += 1;
-	);
+  // Copy from the complex numbers in bufferFFTOR to the bufferO1R tile:
+  index = 0;
+  loop(SIZE,
+    // only take real part
+    bufferO1R[index] = bufferFFTOR[index*2];
+    index += 1;
+  );
 
-	temp = bufferI1L;
-	bufferI1L = bufferI2L;
-	bufferI2L = temp;
+  temp = bufferI1L;
+  bufferI1L = bufferI2L;
+  bufferI2L = temp;
 
-	temp = bufferI1R;
-	bufferI1R = bufferI2R;
-	bufferI2R = temp;
+  temp = bufferI1R;
+  bufferI1R = bufferI2R;
+  bufferI2R = temp;
 
-	temp = bufferO1L;
-	bufferO1L = bufferO2L;
-	bufferO2L = temp;
+  temp = bufferO1L;
+  bufferO1L = bufferO2L;
+  bufferO2L = temp;
 
-	temp = bufferO1R;
-	bufferO1R = bufferO2R;
-	bufferO2R = temp;
+  temp = bufferO1R;
+  bufferO1R = bufferO2R;
+  bufferO2R = temp;
 );
 
 // sliders are serialized automatically
