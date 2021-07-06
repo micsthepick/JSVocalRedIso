@@ -263,16 +263,8 @@ samplesCollected == HALFSIZE ?
 			// get phase width
 			normL = sqrt(sqr(LrealDry) + sqr(LimagDry));
 			normR = sqrt(sqr(RrealDry) + sqr(RimagDry));
-			weight = (
-				1 - (
-					min(
-						1,
-						acos(
-							(LrealDry * RrealDry + LimagDry * RimagDry) / (normL * normR)
-						) / phaseW
-					) ^ strength
-				)
-			) * (
+			w1 = acos((LrealDry * RrealDry + LimagDry * RimagDry) / (normL * normR)) / phaseW;
+			weight = (1 - min(1, w1) ^ strength) * (
 				1 - (sqr(normL - normR)/sqr(normL + normR))
 			) ^ (strength * slider10) / 2;
 
@@ -282,8 +274,8 @@ samplesCollected == HALFSIZE ?
 			// since fft is a linear operator)
 		) : (
 			// let wet signal have 0 for fft coefficients when out of bounds
-			centerReal  = 0;
-			centerImag  = 0;
+			centerReal = 0;
+			centerImag = 0;
 		);
 
 		// apply wet dry mix
