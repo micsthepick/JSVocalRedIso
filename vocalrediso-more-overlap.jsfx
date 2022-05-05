@@ -123,7 +123,7 @@ pdc_bot_ch = 0; pdc_top_ch = 2;
 // (channel number must be greater than or equal to 0,
 // but less than 2, so 0 and 1 - LR output).
 
-// fill windowBuffer
+// fill windowBuffer with length SIZE coefficients of the MLT sine window
 loop(SIZE,
 	windowBuffer[bandIndex] = sin((bandIndex+1/2)*$pi/SIZE);
 
