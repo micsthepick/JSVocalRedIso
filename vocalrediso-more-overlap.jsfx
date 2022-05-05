@@ -26,13 +26,6 @@ out_pin:right output
 
 
 @slider
-// calculate sinc, handling 0 as the limiting value
-function sinc(x)
-(
-	sincIn = $pi * x;
-	sincIn == 0 ? 1 : sin(sincIn) / sincIn;
-);
-
 // convert low cut and high cut to bins every time a slider is changed
 lowBin = min(slider5, slider6) / srate * SIZE;
 highBin = max(slider6, slider5) / srate * SIZE;
@@ -87,7 +80,7 @@ QUARTERSIZE = SIZE/4;
 THREEQUARTER = 3*SIZE/4;
 // track how many half frames of delay from the start we are
 // to mute the first inital buffers
-silence = 2;
+silence = 4;
 
 
 // fft has real and complex values thus is twice as large
