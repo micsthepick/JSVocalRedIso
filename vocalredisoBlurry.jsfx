@@ -260,7 +260,7 @@ samplesCollected == HALFSIZE ?
 		// get phase width
 		normL = sqrt(sqr(LrealDry) + sqr(LimagDry));
 		normR = sqrt(sqr(RrealDry) + sqr(RimagDry));
-		w1 = acos((LrealDry * RrealDry + LimagDry * RimagDry) / (normL * normR)) / phaseW
+		w1 = acos((LrealDry * RrealDry + LimagDry * RimagDry) / (normL * normR)) / phaseW;
 		weight = (
 			1 - (min(1, w1) ^ strength)
 		) * (
