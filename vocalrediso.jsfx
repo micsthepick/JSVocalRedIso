@@ -68,6 +68,16 @@ loop(SIZE,
 
 
 @init
+
+_free_memory = 0;
+function simple_alloc(amount)
+local(_free_memory_old)
+global(_free_memory)
+(
+  _free_memory_old = _free_memory;
+  _free_memory += amount;
+  _free_memory_old;
+);
 // init variables
 // buffers
 // FFT - fft window size (will be constant)
@@ -82,23 +92,25 @@ silence = 2;
 
 
 // fft has real and complex values thus is twice as large
-// set each buffer to the offsef from the last to make it easier to move them around
-bufferFFTIL = 0;
-bufferFFTIR = bufferFFTIL+DOUBLESIZE;
-bufferFFTOL = bufferFFTIR+DOUBLESIZE;
-bufferFFTOR = bufferFFTOL+DOUBLESIZE;
-bufferI1L = bufferFFTOR+DOUBLESIZE;
-bufferI2L = bufferI1L+SIZE;
-bufferI1R = bufferI2L+SIZE;
-bufferI2R = bufferI1R+SIZE;
-bufferO1L = bufferI2R+SIZE;
-bufferO2L = bufferO1L+SIZE;
-bufferO1R = bufferO2L+SIZE;
-bufferO2R = bufferO1R+SIZE;
-strengthBuffer = bufferO2R+SIZE;
-phaseWBuffer = strengthBuffer+SIZE;
-windowBuffer = phaseWBuffer+SIZE;
-freembuf(windowBuffer+SIZE);
+// so each fft buffer is twice the size of a regular buffer
+bufferFFTIL = simple_alloc(DOUBLESIZE);
+bufferFFTIR = simple_alloc(DOUBLESIZE);
+bufferFFTOL = simple_alloc(DOUBLESIZE);
+bufferFFTOR = simple_alloc(DOUBLESIZE);
+// all the fft buffers are at the start, to prevent crossing a 65536 boundary
+// so after this line should be all the regular buffers
+bufferI1L = simple_alloc(SIZE);
+bufferI2L = simple_alloc(SIZE);
+bufferI1R = simple_alloc(SIZE);
+bufferI2R = simple_alloc(SIZE);
+bufferO1L = simple_alloc(SIZE);
+bufferO2L = simple_alloc(SIZE);
+bufferO1R = simple_alloc(SIZE);
+bufferO2R = simple_alloc(SIZE);
+strengthBuffer = simple_alloc(SIZE);
+phaseWBuffer = simple_alloc(SIZE);
+windowBuffer = simple_alloc(SIZE);
+freembuf(_free_memory);
 
 // samplesCollected tracks the position in the last of the two tiles
 // ranges from 0 to (SIZE/2)-1
