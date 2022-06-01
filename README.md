@@ -39,10 +39,11 @@ Adjust stregth and phase width (how close are the two signals to the same phase)
 "Phase (degrees)" controls what pan in the stereo track the centre signal will be constructed from. 0 Means exaclty the centre, 45 means panned hard left, -45 means panned hard right.
 sometimes setting the phase to 90 or -90 (and setting dry mix to 0) can isolate things that are not centre panned and can give a better seperation (e.g. for karaoke wen centre subtraction does not give good results), however it will also only give a mono signal in that case.  
 If you set the phase to anything but 0, if dry mix is 0, to have a balanced output it is recommended to enable "undo rotation due to phase", unless you plan to combine the output of the plugin with the original input (compensating for the introduced delay)
+Phase2 controls the phase offset between both channels, controlled by rotating the left phase by that many degrees. It usually doesn't lead to much good results, but it is left there in case it might be wanted.
 
 ### A word of caution
 Some tracks are mixed in such a way that the results from this plugin will not be so sucessful.  
-In that case it is best to go find a pre mixed version. You might get away with making an acapella version by aligning and subtracting an instrumental version with the original mix, or vice versa if you have the wrong version.
+In that case it is best to go find a pre mixed version. You might get away with making an acapella version by aligning and subtracting an instrumental version with the original mix, or vice versa if you have the wrong version. There is a plugin that I've made to get better results with this, but with more artifacts: https://github.com/micsthepick/JSFFTDenoise
 
 ### Credits
-Robert Haenggi for making the original vocalrediso.ny for Audacity, and Neil Bickford for making the Noise Reduction [effect](https://github.com/Nbickford/REAPERDenoiser) which I was able to base my code from to use the algorithm in realtime.
+Robert Haenggi for making the original vocalrediso.ny for Audacity, and Neil Bickford for making the Noise Reduction [effect](https://github.com/Nbickford/REAPERDenoiser) which helped me first make the effect, and finally Geraint Luff for the STFT template that I currently use: https://forum.cockos.com/showthread.php?t=225955
