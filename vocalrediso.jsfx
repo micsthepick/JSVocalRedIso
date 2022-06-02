@@ -48,6 +48,7 @@ function process_stft_segment(fft_buffer, fft_size) local(fft_bin, left_real, le
     //////////////////////// Main STFT block
     // The 'meat' of the algorithm, the code in this block will most resemble the code from vocalrediso.ny
 
+    
     // first, apply  vocal reduction algorithm only in the right bands
     fft_bin >= low_bin && fft_bin < high_bin ? (
       // get constants for this bin
@@ -89,14 +90,15 @@ function process_stft_segment(fft_buffer, fft_size) local(fft_bin, left_real, le
     // output corrections
     slider11 > 0.5 ? (
       // if requested, undo input corrections
-      l_real_twisted = out_l_real*cosine - out_l_imag*sine;
-      l_imag_twisted = out_l_imag*cosine + out_l_imag*sine;
       
-      right_real = out_r_real*cosine - l_real_twisted*sine;
-      right_imag = out_r_imag*cosine - l_imag_twisted*sine;
+      // unmix by phase
+      l_real_out_twisted = out_l_real*cosine - out_r_real*sine;
+      l_imag_out_twisted = out_l_imag*cosine - out_r_imag*sine;
+      right_real = out_r_real*cosine + out_l_real*sine;
+      right_imag = out_r_imag*cosine + out_l_imag*sine;
 
-      left_real = l_real_twisted * cosine2 - l_imag_twisted * sine2;
-      left_imag = l_real_twisted * cosine2 + l_imag_twisted * sine2;
+      left_real = l_real_out_twisted * cosine2 - l_imag_out_twisted * sine2;
+      left_imag = l_imag_out_twisted * cosine2 + l_real_out_twisted * sine2;
     ) :
     (
       // else, just copy the values
@@ -140,7 +142,9 @@ freemem = (phase_width_buffer = freemem) + buffer_length*2;
 
 function window(r) local(s, s2, gaussian_width, x) (
   // When squared, the Hann window adds up perfectly for overlap >= 4, so it's suitable for perfect reconstruction
-  (0.5 - 0.5*cos(r*2*$pi))/sqrt(0.375);
+  //(0.5 - 0.5*cos(r*2*$pi))/sqrt(0.375);
+  // the MLT sine window also appears to add up correctly, with sigma = sqrt(2).
+  sin(r*$pi)*sqrt(2);
 );
 
 overlap_factor = 8;
