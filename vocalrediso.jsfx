@@ -25,7 +25,7 @@ slider12:0<-180,180,0.05>Phase2 (Degrees)
 
 function process_stft_segment(fft_buffer, fft_size) local(fft_bin, left_real, left_imag, right_real, right_imag) (
   fft_bin = 0; // FFT bin number
-  loop(fft_size/2,
+  loop(fft_size/2+1,
     fft_bin2 = fft_bin ? (fft_size - fft_bin) : 0;
 
     // Unfold complex spectrum into two real spectra
@@ -147,7 +147,7 @@ function window(r) local(s, s2, gaussian_width, x) (
   sin(r*$pi)*sqrt(2);
 );
 
-overlap_factor = 8;
+overlap_factor = 4;
 fft_interval = fft_size/overlap_factor;
 fft_scaling_factor = 1/overlap_factor/fft_size;
 
