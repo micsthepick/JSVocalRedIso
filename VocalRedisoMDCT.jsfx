@@ -45,10 +45,10 @@ _memory_index = (buffer_MDCT_real_L = _memory_index) + SIZE;
 _memory_index = (buffer_MDCT_imag_L = _memory_index) + SIZE;
 _memory_index = (buffer_MDCT_real_R = _memory_index) + SIZE;
 _memory_index = (buffer_MDCT_imag_R = _memory_index) + SIZE;
-_memory_index = (buffer_input_L = _memory_index) + srate;
-_memory_index = (buffer_input_R = _memory_index) + srate;
-_memory_index = (buffer_output_L = _memory_index) + srate;
-_memory_index = (buffer_output_R = _memory_index) + srate;
+_memory_index = (buffer_input_L = _memory_index) + DOUBLESIZE;
+_memory_index = (buffer_input_R = _memory_index) + DOUBLESIZE;
+_memory_index = (buffer_output_L = _memory_index) + DOUBLESIZE;
+_memory_index = (buffer_output_R = _memory_index) + DOUBLESIZE;
 _memory_index = (buffer_param_strength = _memory_index) + SIZE/2;
 _memory_index = (buffer_param_phase_width = _memory_index) + SIZE/2;
 freembuf(_memory_index);
@@ -124,13 +124,13 @@ samples_collected >= HALFSIZE ?
 	// wrap back to 0 on the tile
 
 	// move input to buffer_MDCT_*
-	so = buffer_index - SIZE + 1 + srate;
+	so = buffer_index + SIZE;
 	bi = 0;
 	loop(SIZE,
-		buffer_MDCT_real_L[bi] = buffer_input_L[(so + bi) % srate];
-		buffer_MDCT_imag_L[SIZEMINUSONE-bi] = buffer_input_L[(so + bi) % srate];
-		buffer_MDCT_real_R[bi] = buffer_input_R[(so + bi) % srate];
-		buffer_MDCT_imag_R[SIZEMINUSONE-bi] = buffer_input_R[(so + bi) % srate];
+		buffer_MDCT_real_L[bi] = buffer_input_L[(so + bi) % DOUBLESIZE];
+		buffer_MDCT_imag_L[SIZEMINUSONE-bi] = buffer_input_L[(so + bi) % DOUBLESIZE];
+		buffer_MDCT_real_R[bi] = buffer_input_R[(so + bi) % DOUBLESIZE];
+		buffer_MDCT_imag_R[SIZEMINUSONE-bi] = buffer_input_R[(so + bi) % DOUBLESIZE];
 		
 		bi += 1;
 	);
@@ -223,8 +223,8 @@ samples_collected >= HALFSIZE ?
 	so = buffer_index;
 	bi = 0;
 	loop(SIZE,
-		buffer_output_L[(so + bi) % srate] += buffer_MDCT_real_L[bi];
-		buffer_output_R[(so + bi) % srate] += buffer_MDCT_real_R[bi];
+		buffer_output_L[(so + bi) % DOUBLESIZE] += buffer_MDCT_real_L[bi];
+		buffer_output_R[(so + bi) % DOUBLESIZE] += buffer_MDCT_real_R[bi];
 		
 		bi += 1;
 	);
@@ -232,7 +232,7 @@ samples_collected >= HALFSIZE ?
 
 
 // output samples
-//output_index = (buffer_index - fft_size) % srate;
+//output_index = (buffer_index - fft_size) % DOUBLESIZE;
 out_L = buffer_output_L[buffer_index];
 out_R = buffer_output_R[buffer_index];
 
@@ -246,7 +246,7 @@ silence == 0 ? (
 	spl1 = out_R;
 ) : spl0 = spl1 = 0;
 
-buffer_index = (buffer_index + 1) % srate;
+buffer_index = (buffer_index + 1) % DOUBLESIZE;
 
 // sliders are serialized automatically
 // thus nothing to serialize
