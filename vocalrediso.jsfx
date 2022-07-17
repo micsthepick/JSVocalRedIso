@@ -22,6 +22,15 @@ slider12:0<-180,180,0.05>Phase2 (Degrees)
 
 
 @init
+function setup_stft_state(fft_size, first_time) (
+  //////////////////////// Setup block
+  // This is called when playback starts, or when the FFT size is changed
+  memset(fft_buffer, 0.0, MAX_FFT_SIZE*2);
+  memset(output_buffer, 0.0, buffer_length*2);
+  ////////////////////////
+);
+
+setup_stft_state(fft_size, prev_fft_size == 0);
 
 function process_stft_segment(fft_buffer, fft_size) local(fft_bin, left_real, left_imag, right_real, right_imag) (
   fft_bin = 0; // FFT bin number
@@ -114,13 +123,6 @@ function process_stft_segment(fft_buffer, fft_size) local(fft_bin, left_real, le
 
     fft_bin += 1;
   );
-);
-
-function setup_stft_state(fft_size, first_time) (
-  //////////////////////// Setup block
-  // This is called when playback starts, or when the FFT size is changed
-  0;
-  ////////////////////////
 );
 
 MAX_FFT_SIZE = 32768;
