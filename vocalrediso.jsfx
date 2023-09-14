@@ -65,7 +65,7 @@ function process_stft_segment(fft_buffer, fft_size) local(fft_bin, left_real, le
       // by 1 - the square of the difference between the two norm values divided by the sum of the two, moderated by strength * slider10
       weight = (1 - min(1, max(0, w1)) ^ strength) * (
 				1 - (sqr(norm_left - norm_right)/sqr(norm_left + norm_right))
-			) ^ (strength * slider10) / 2;
+			) ^ (slider10 / strength) / 2;
 
       // find the c channel, the sum of the two complex numbers
       c_real = l_real_rotated + r_real_rotated;
@@ -142,9 +142,9 @@ freemem = (phase_width_buffer = freemem) + buffer_length*2;
 
 function window(r) local(s, s2, gaussian_width, x) (
   // When squared, the Hann window adds up perfectly for overlap >= 4, so it's suitable for perfect reconstruction
-  //(0.5 - 0.5*cos(r*2*$pi))/sqrt(0.375);
+  (0.5 - 0.5*cos(r*2*$pi))/sqrt(0.375);
   // the MLT sine window also appears to add up correctly, with sigma = sqrt(2).
-  sin(r*$pi)*sqrt(2);
+  //sin(r*$pi)*sqrt(2);
 );
 
 overlap_factor = 4;
@@ -157,7 +157,7 @@ fft_size != prev_fft_size ? (
   // Fill window buffer
   i = 0;
   loop(fft_size,
-    r = (i + 0.5)/fft_size;
+    r = i/fft_size;
     window_buffer[i] = window(r);
     i += 1;
   );
