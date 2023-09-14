@@ -23,6 +23,8 @@ slider12:0<-180,180,0.05>Phase2 (Degrees)
 
 @init
 
+prev_fft_size = 0;
+
 function process_stft_segment(fft_buffer, fft_size) local(fft_bin, left_real, left_imag, right_real, right_imag) (
   fft_bin = 0; // FFT bin number
   loop(fft_size/2+1,
@@ -50,7 +52,7 @@ function process_stft_segment(fft_buffer, fft_size) local(fft_bin, left_real, le
 
     
     // first, apply  vocal reduction algorithm only in the right bands
-    fft_bin >= low_bin && fft_bin < high_bin ? (
+    fft_bin >= low_bin && fft_bin <= high_bin ? (
       // get constants for this bin
       strength = strength_buffer[fft_bin];
       phase_width = phase_width_buffer[fft_bin];
@@ -121,7 +123,9 @@ function process_stft_segment(fft_buffer, fft_size) local(fft_bin, left_real, le
 function setup_stft_state(fft_size, first_time) (
   //////////////////////// Setup block
   // This is called when playback starts, or when the FFT size is changed
-  0;
+  memset(fft_buffer, 0, 2*fft_size);
+  memset(output_buffer, 0, buffer_length*2);
+  memset(input_buffer, 0, buffer_length*2);
   ////////////////////////
 );
 
@@ -132,19 +136,19 @@ freemem = 0;
 freemem = (fft_buffer = freemem) + MAX_FFT_SIZE*2;
 freemem = (window_buffer = freemem) + MAX_FFT_SIZE;
 
+freemem = (strength_buffer = freemem) + MAX_FFT_SIZE;
+freemem = (phase_width_buffer = freemem) + MAX_FFT_SIZE;
+
 buffer_length = srate;
 buffer_index = 0;
 freemem = (input_buffer = freemem) + buffer_length*2;
 freemem = (output_buffer = freemem) + buffer_length*2;
 
-freemem = (strength_buffer = freemem) + buffer_length*2;
-freemem = (phase_width_buffer = freemem) + buffer_length*2;
-
 function window(r) local(s, s2, gaussian_width, x) (
   // When squared, the Hann window adds up perfectly for overlap >= 4, so it's suitable for perfect reconstruction
-  (0.5 - 0.5*cos(r*2*$pi))/sqrt(0.375);
+  //(0.5 - 0.5*cos(r*2*$pi))/sqrt(0.375);
   // the MLT sine window also appears to add up correctly, with sigma = sqrt(2).
-  //sin(r*$pi)*sqrt(2);
+  sin(r*$pi)*sqrt(2);
 );
 
 overlap_factor = 4;
@@ -245,7 +249,7 @@ sine2 = sin(slider12*$pi/180);
 // fill strength_buffer and phase_width_buffer
 band_index = 0;
 loop(fft_size,
-  band_index >= low_bin && band_index < high_bin ?
+  band_index >= low_bin && band_index <= high_bin ?
   (
     // only set values for the appropriate frequency range
     frac = (band_index - low_bin)/(high_bin - low_bin - 1);
