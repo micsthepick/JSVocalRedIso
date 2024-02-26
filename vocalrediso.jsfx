@@ -22,6 +22,8 @@ slider12:0<-180,180,0.05>Phase2 (Degrees)
 
 
 @init
+prev_fft_size = 0;
+
 function setup_stft_state(fft_size, first_time) (
   //////////////////////// Setup block
   // This is called when playback starts, or when the FFT size is changed
@@ -34,7 +36,7 @@ setup_stft_state(fft_size, prev_fft_size == 0);
 
 function process_stft_segment(fft_buffer, fft_size) local(fft_bin, left_real, left_imag, right_real, right_imag) (
   fft_bin = 0; // FFT bin number
-  loop(fft_size/2,
+  loop(fft_size/2+1,
     fft_bin2 = fft_bin ? (fft_size - fft_bin) : 0;
 
     // Unfold complex spectrum into two real spectra
@@ -57,8 +59,9 @@ function process_stft_segment(fft_buffer, fft_size) local(fft_bin, left_real, le
     //////////////////////// Main STFT block
     // The 'meat' of the algorithm, the code in this block will most resemble the code from vocalrediso.ny
 
+    
     // first, apply  vocal reduction algorithm only in the right bands
-    fft_bin >= low_bin && fft_bin < high_bin ? (
+    fft_bin >= low_bin && fft_bin <= high_bin ? (
       // get constants for this bin
       strength = strength_buffer[fft_bin];
       phase_width = phase_width_buffer[fft_bin];
@@ -73,7 +76,7 @@ function process_stft_segment(fft_buffer, fft_size) local(fft_bin, left_real, le
       // by 1 - the square of the difference between the two norm values divided by the sum of the two, moderated by strength * slider10
       weight = (1 - min(1, max(0, w1)) ^ strength) * (
 				1 - (sqr(norm_left - norm_right)/sqr(norm_left + norm_right))
-			) ^ (strength * slider10) / 2;
+			) ^ (slider10 / strength) / 2;
 
       // find the c channel, the sum of the two complex numbers
       c_real = l_real_rotated + r_real_rotated;
@@ -98,14 +101,15 @@ function process_stft_segment(fft_buffer, fft_size) local(fft_bin, left_real, le
     // output corrections
     slider11 > 0.5 ? (
       // if requested, undo input corrections
-      l_real_twisted = out_l_real*cosine - out_l_imag*sine;
-      l_imag_twisted = out_l_imag*cosine + out_l_imag*sine;
       
-      right_real = out_r_real*cosine - l_real_twisted*sine;
-      right_imag = out_r_imag*cosine - l_imag_twisted*sine;
+      // unmix by phase
+      l_real_out_twisted = out_l_real*cosine - out_r_real*sine;
+      l_imag_out_twisted = out_l_imag*cosine - out_r_imag*sine;
+      right_real = out_r_real*cosine + out_l_real*sine;
+      right_imag = out_r_imag*cosine + out_l_imag*sine;
 
-      left_real = l_real_twisted * cosine2 - l_imag_twisted * sine2;
-      left_imag = l_real_twisted * cosine2 + l_imag_twisted * sine2;
+      left_real = l_real_out_twisted * cosine2 - l_imag_out_twisted * sine2;
+      left_imag = l_imag_out_twisted * cosine2 + l_real_out_twisted * sine2;
     ) :
     (
       // else, just copy the values
@@ -132,20 +136,22 @@ freemem = 0;
 freemem = (fft_buffer = freemem) + MAX_FFT_SIZE*2;
 freemem = (window_buffer = freemem) + MAX_FFT_SIZE;
 
+freemem = (strength_buffer = freemem) + MAX_FFT_SIZE;
+freemem = (phase_width_buffer = freemem) + MAX_FFT_SIZE;
+
 buffer_length = srate;
 buffer_index = 0;
 freemem = (input_buffer = freemem) + buffer_length*2;
 freemem = (output_buffer = freemem) + buffer_length*2;
 
-freemem = (strength_buffer = freemem) + buffer_length*2;
-freemem = (phase_width_buffer = freemem) + buffer_length*2;
-
 function window(r) local(s, s2, gaussian_width, x) (
   // When squared, the Hann window adds up perfectly for overlap >= 4, so it's suitable for perfect reconstruction
-  (0.5 - 0.5*cos(r*2*$pi))/sqrt(0.375);
+  //(0.5 - 0.5*cos(r*2*$pi))/sqrt(0.375);
+  // the MLT sine window also appears to add up correctly, with sigma = sqrt(2).
+  sin(r*$pi)*sqrt(2);
 );
 
-overlap_factor = 8;
+overlap_factor = 4;
 fft_interval = fft_size/overlap_factor;
 fft_scaling_factor = 1/overlap_factor/fft_size;
 
@@ -155,7 +161,7 @@ fft_size != prev_fft_size ? (
   // Fill window buffer
   i = 0;
   loop(fft_size,
-    r = (i + 0.5)/fft_size;
+    r = i/fft_size;
     window_buffer[i] = window(r);
     i += 1;
   );
@@ -243,7 +249,7 @@ sine2 = sin(slider12*$pi/180);
 // fill strength_buffer and phase_width_buffer
 band_index = 0;
 loop(fft_size,
-  band_index >= low_bin && band_index < high_bin ?
+  band_index >= low_bin && band_index <= high_bin ?
   (
     // only set values for the appropriate frequency range
     frac = (band_index - low_bin)/(high_bin - low_bin - 1);
