@@ -19,4 +19,4 @@ jobs:
 
     - name: Run Tests
       run: |
-        test_eel.sh
+        ./test_eel.sh
