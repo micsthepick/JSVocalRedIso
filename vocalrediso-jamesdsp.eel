@@ -394,10 +394,10 @@ assert_near_equal(200, 0.001, spl1sum, "SAMPLE_1_1_TEST: spl1sum was not as expe
 //DEBUGPRINT("spl0sum=%g, spl1sum=%g\n", spl0sum, spl1sum);
 
 
-//DEBUGPRINT("SETUP: fft range is [0, srate/2] dry=100 wet=100\n");
+//DEBUGPRINT("SETUP: fft range is [srate/2, srate] dry=100 wet=100\n");
 slider1 = slider2 = 100;
-slider5 = 0;
-slider6 = srate/2;
+slider5 = srate/2;
+slider6 = srate;
 //DEBUGPRINT("PDC_SILENCE_ON_PARTIAL_RANGE_TEST\n");
 slider_code();
 sum_first_pdc_samples(1, 1);
