@@ -1,15 +1,44 @@
+// Helper functions to check for positive infinity, negative infinity, and nan
+function is_pos_inf(x) (x ==  1/0);
+function is_neg_inf(x) (x == -1/0);
+function is_nan(x) (x != x;);
+
 function assert_equal_exact(expected, actual, message) global() (
-    (expected !== actual) ? printf("expected: %d, was: %d. %s\n", expected, actual, message)
+	is_nan(expected) && is_nan(actual) ? 0 :
+	(is_pos_inf(expected) && is_pos_inf(actual)) || (is_neg_inf(expected) && is_neg_inf(actual)) ? 0 :
+	expected !== actual ? (
+		printf("expected: %g, was: %g. %s\n", expected, actual, message)
+	) : 0;
 );
 
 function assert_equal_exact(expected, actual) global() (
-    assert_equal_exact(expected, actual, "values differ!")
+	assert_equal_exact(expected, actual, "values differ!")
+);
+
+function assert_near_equal(expected, tolerance, actual, message) global() (
+	is_nan(expected) || is_nan(actual) || is_nan(tolerance) ? 0 :
+		(is_pos_inf(expected) || is_neg_inf(expected)) && (is_pos_inf(actual) || is_neg_inf(actual)) ? 0 :
+		abs(expected - actual) > tolerance ? (
+		printf("expected: %g (±%g), was: %g. %s\n", expected, tolerance, actual, message)
+	) : 0;
+);
+
+function assert_near_equal(expected, tolerance, actual) (
+	assert_near_equal(expected, tolerance, actual, "values are not equal within tolerance!");
 );
 
 function assert_true(boolean, message) global() (
-    (!boolean) ? printf("expected true, was false. %s\n", message)
+	(!boolean) ? printf("expected: true, was: false. %s\n", message)
 );
 
 function assert_false(boolean, message) global() (
-    boolean ? printf("expected false, was true. %s\n", message)
+	boolean ? printf("expected: false, was: true. %s\n", message)
+);
+
+function assert_true(boolean) global() (
+	assert_true(boolean, "");
+);
+
+function assert_false(boolean) global() (
+	assert_false(boolean, "");
 );

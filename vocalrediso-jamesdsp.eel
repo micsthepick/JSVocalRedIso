@@ -57,6 +57,7 @@ function setup_stft_state(fft_size, first_time) (
 	memset(fft_buffer, 0, MAX_FFT_SIZE*2);
 	memset(output_buffer, 0, buffer_length*2);
 	memset(input_buffer, 0, buffer_length*2);
+	buffer_index = 0;
 	////////////////////////
 );
 
@@ -302,75 +303,96 @@ buffer_index = (buffer_index + 1)%buffer_length;
 //IFTEST ); // function sample_code() (
 
 
-/*IFTEST{* // main test block
-//DEBUGPRINT("SETUP: dry=100 wet=100\n");
+///*IFTEST{* // main test block
+
+// helpers
+function sum_first_pdc_samples(s0val, s1val) (
+	setup_stft_state(fft_size, 1);
+	spl0sum = 0;
+	spl1sum = 0;
+	loop(pdc_delay,
+		spl0=s0val;
+		spl1=s1val;
+		sample_code();
+		spl0sum += abs(spl0);
+		spl1sum += abs(spl1);
+	);
+);
+
+//DEBUGPRINT("SETUP: fft range is [0, srate] dry=100 wet=100\n");
 slider1 = slider2 = 100;
+slider5 = 0;
+slider6 = srate;
 slider_code();
 
-//DEBUGPRINT("Test 1:SAMPLE_0_0_TEST\n");
-// spl0=0 spl1=1 for buffer_length*2 samples
-setup_stft_state(fft_size, 1);
-spl0sum = 0;
-spl1sum = 0;
-loop(10,
+//DEBUGPRINT("SAMPLE_0_0_TEST\n");
+// spl0=0 spl1=0 for buffer_length*2 samples
+sum_first_pdc_samples(0, 0);
+assert_equal_exact(0, spl0sum, "spl0sum for init");
+assert_equal_exact(0, spl1sum, "spl1sum for init");
+
+loop(100,
 	spl0=0;
 	spl1=0;
 	sample_code();
 	spl0sum += abs(spl0);
 	spl1sum += abs(spl1);
 );
+assert_near_equal(0, 0.001, spl0sum, "SAMPLE_0_0_TEST: spl0sum was not as expected");
+assert_near_equal(0, 0.001, spl1sum, "SAMPLE_0_0_TEST: spl1sum was not as expected");
 //DEBUGPRINT("spl0sum=%g, spl1sum=%g\n", spl0sum, spl1sum);
 
-//DEBUGPRINT("SAMPLE_0_0_TEST\n");
+//DEBUGPRINT("SAMPLE_1_0_TEST\n");
 // spl0=1 spl1=0 for buffer_length*2 samples
-setup_stft_state(fft_size, 1);
-spl0sum = 0;
-spl1sum = 0;
-loop(10,
+sum_first_pdc_samples(1, 0);
+assert_equal_exact(0, spl0sum, "spl0sum for init");
+assert_equal_exact(0, spl1sum, "spl1sum for init");
+
+loop(100,
 	spl0=1;
 	spl1=0;
 	sample_code();
-	spl0sum += 1000000*abs(spl1);
-	spl1sum += 1000000*abs(spl0);
+	spl0sum += abs(spl0);
+	spl1sum += abs(spl1);
 );
+assert_near_equal(100, 0.001, spl0sum, "SAMPLE_1_0_TEST: spl0sum was not as expected");
+assert_near_equal(0, 0.001, spl1sum, "SAMPLE_1_0_TEST: spl1sum was not as expected");
 //DEBUGPRINT("spl0sum=%g, spl1sum=%g\n", spl0sum, spl1sum);
-
 
 //DEBUGPRINT("SAMPLE_0_1_TEST\n");
 // spl0=0 spl1=1 for buffer_length*2 samples
-setup_stft_state(fft_size, 1);
-spl0sum = 0;
-spl1sum = 0;
-loop(buffer_length*8,
+sum_first_pdc_samples(0, 1);
+assert_equal_exact(0, spl0sum, "spl0sum for init");
+assert_equal_exact(0, spl1sum, "spl1sum for init");
+
+loop(100,
 	spl0=0;
 	spl1=1;
 	sample_code();
-	spl0sum += 1000000*abs(spl0);
-	spl1sum += 1000000*abs(spl1);
+	spl0sum += abs(spl0);
+	spl1sum += abs(spl1);
 );
+assert_near_equal(0, 0.001, spl0sum, "SAMPLE_0_1_TEST: spl0sum was not as expected");
+assert_near_equal(100, 0.001, spl1sum, "SAMPLE_0_1_TEST: spl1sum was not as expected");
 //DEBUGPRINT("spl0sum=%g, spl1sum=%g\n", spl0sum, spl1sum);
 
 //DEBUGPRINT("SAMPLE_1_1_TEST\n");
-// spl0=1 spl1=0 for buffer_length*2 samples
-setup_stft_state(fft_size, 1);
-/*IFTEST{*
-spl0sum = 0;
-spl1sum = 0;
-loop(buffer_length*8,
-	spl0=0;
+// spl0=1 spl1=1 for buffer_length*2 samples
+sum_first_pdc_samples(1, 1);
+assert_equal_exact(0, spl0sum, "spl0sum for init");
+assert_equal_exact(0, spl1sum, "spl1sum for init");
+
+loop(100,
+	spl0=1;
 	spl1=1;
 	sample_code();
-	spl0sum += 1000000*abs(spl1);
-	spl1sum += 1000000*abs(spl0);
+	spl0sum += abs(spl0);
+	spl1sum += abs(spl1);
 );
+assert_near_equal(200, 0.001, spl0sum, "SAMPLE_1_1_TEST: spl0sum was not as expected");
+assert_near_equal(200, 0.001, spl1sum, "SAMPLE_1_1_TEST: spl1sum was not as expected");
 //DEBUGPRINT("spl0sum=%g, spl1sum=%g\n", spl0sum, spl1sum);
 
 //DEBUGPRINT("Testing Completed Without Crashing!\n");
-
-function exit(code) (
-  code|0;
-);
-
-atexit("exit(-1)");
 
 *}IFTEST*/ // main test block
