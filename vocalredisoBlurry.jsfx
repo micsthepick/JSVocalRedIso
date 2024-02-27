@@ -27,12 +27,6 @@ out_pin:right output
 
 
 @slider
-// calculate sinc, handling 0 as the limiting value
-function sinc(x)
-(
-	sincIn = $pi * x;
-	sincIn == 0 ? 1 : sin(sincIn) / sincIn;
-);
 
 // convert low cut and high cut to bins every time a slider is changed
 lowBin = min(slider5, slider6) / srate * SIZE;
