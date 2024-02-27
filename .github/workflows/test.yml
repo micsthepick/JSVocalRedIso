@@ -15,7 +15,7 @@ jobs:
 
     - name: Compile EEL2 with NO_GFX
       run: |
-        make -C WDL/WDL/eel2 NO_GFX=1
+        ./compile_wdl.sh
 
     - name: Run Tests
       run: |
