@@ -44,8 +44,9 @@ prev_fft_size = 0;
 function setup_stft_state(fft_size, first_time) (
 	//////////////////////// Setup block
 	// This is called when playback starts, or when the FFT size is changed
-	memset(fft_buffer, 0.0, MAX_FFT_SIZE*2);
-	memset(output_buffer, 0.0, buffer_length*2);
+	memset(fft_buffer, 0, MAX_FFT_SIZE*2);
+	memset(output_buffer, 0, buffer_length*2);
+	memset(input_buffer, 0, buffer_length*2);
 	////////////////////////
 );
 
@@ -76,7 +77,7 @@ function process_stft_segment(fft_buffer, fft_size) local(fft_bin, left_real, le
 		//////////////////////// Main STFT block
 		// The 'meat' of the algorithm, the code in this block will most resemble the code from vocalrediso.ny
 
-		// first, apply	vocal reduction algorithm only in the right bands
+		// first, apply vocal reduction algorithm only in the right bands
 		fft_bin >= low_bin && fft_bin <= high_bin ? (
 			// get constants for this bin
 			strength = strength_buffer[fft_bin];

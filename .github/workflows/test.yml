@@ -1,0 +1,27 @@
+name: test JSFX
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+      name: Check out repository code
+      with:
+        # Fetches all submodules recursively
+        submodules: 'recursive'
+
+    - name: Compile EEL2 with NO_GFX
+      run: |
+        make -C WDL/WDL/eel2 NO_GFX=1
+
+    - name: Compile JSFX Plugins
+      run: |
+        # Add commands to compile your JSFX scripts
+        # Example: eel2compiler my_plugin.jsfx
+
+    - name: Run Tests
+      run: |
+        test_eel.sh

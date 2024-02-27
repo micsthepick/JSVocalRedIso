@@ -1,0 +1,15 @@
+function assert_equal_exact(expected, actual, message) global() (
+    (expected !== actual) ? printf("expected: %d, was: %d. %s\n", expected, actual, message)
+);
+
+function assert_equal_exact(expected, actual) global() (
+    assert_equal_exact(expected, actual, "values differ!")
+);
+
+function assert_true(boolean, message) global() (
+    (!boolean) ? printf("expected true, was false. %s\n", message)
+);
+
+function assert_false(boolean, message) global() (
+    boolean ? printf("expected false, was true. %s\n", message)
+);
