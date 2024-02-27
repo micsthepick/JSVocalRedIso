@@ -393,6 +393,16 @@ assert_near_equal(200, 0.001, spl0sum, "SAMPLE_1_1_TEST: spl0sum was not as expe
 assert_near_equal(200, 0.001, spl1sum, "SAMPLE_1_1_TEST: spl1sum was not as expected");
 //DEBUGPRINT("spl0sum=%g, spl1sum=%g\n", spl0sum, spl1sum);
 
-//DEBUGPRINT("Testing Completed Without Crashing!\n");
 
-*}IFTEST*/ // main test block
+//DEBUGPRINT("SETUP: fft range is [0, srate/2] dry=100 wet=100\n");
+slider1 = slider2 = 100;
+slider5 = 0;
+slider6 = srate/2;
+//DEBUGPRINT("PDC_SILENCE_ON_PARTIAL_RANGE_TEST\n");
+slider_code();
+sum_first_pdc_samples(1, 1);
+assert_equal_exact(0, spl0sum, "PDC_SILENCE_ON_PARTIAL_RANGE_TEST failed on spl0");
+assert_equal_exact(0, spl1sum, "PDC_SILENCE_ON_PARTIAL_RANGE_TEST failed on spl1");
+
+//DEBUGPRINT("Testing Completed Without Crashing!\n");
+//*}IFTEST*/ // main test block
