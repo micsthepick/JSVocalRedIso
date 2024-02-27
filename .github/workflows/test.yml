@@ -17,11 +17,6 @@ jobs:
       run: |
         make -C WDL/WDL/eel2 NO_GFX=1
 
-    - name: Compile JSFX Plugins
-      run: |
-        # Add commands to compile your JSFX scripts
-        # Example: eel2compiler my_plugin.jsfx
-
     - name: Run Tests
       run: |
         test_eel.sh
