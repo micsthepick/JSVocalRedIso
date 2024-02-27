@@ -5,6 +5,8 @@
 // which now uses the STFT template code by geraintluff: https://forum.cockos.com/showthread.php?t=225955
 
 desc: vocal removal/isolation
+//tags: processing vocals stereo
+//author: Michael Pannekoek
 
 //slider1:fft_size_index=2<0,7,1{256,512,1024,2048,4096,8192,16384,32768}>FFT size
 slider1:0<-100,100,0.1>dry mix
@@ -19,6 +21,11 @@ slider9:90<1,180,0.1>Phase width at High Cut (Degrees)
 slider10:1<0,1,0.05>Attenuate if different volume
 slider11:1<0,1,1{No,Yes}>undo input corrections
 slider12:0<-180,180,0.05>Phase2 (Degrees)
+
+in_pin:left input
+in_pin:right input
+out_pin:left output
+out_pin:right output
 
 
 @init
