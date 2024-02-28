@@ -336,7 +336,7 @@ slider6 = srate/2;
 slider_code();
 
 //DEBUGPRINT("SAMPLE_0_0_TEST\n");
-// spl0=0 spl1=0 for buffer_length*2 samples
+// spl0=0 spl1=0 for 100 output samples
 sum_first_pdc_samples(0, 0);
 assert_equal_exact(0, spl0sum, "spl0sum for init");
 assert_equal_exact(0, spl1sum, "spl1sum for init");
@@ -353,7 +353,7 @@ assert_near_equal(0, 0.001, spl1sum, "SAMPLE_0_0_TEST: spl1sum was not as expect
 //DEBUGPRINT("spl0sum=%g, spl1sum=%g\n", spl0sum, spl1sum);
 
 //DEBUGPRINT("SAMPLE_1_0_TEST\n");
-// spl0=1 spl1=0 for buffer_length*2 samples
+// spl0=1 spl1=0 for for 100 output samples
 sum_first_pdc_samples(1, 0);
 assert_equal_exact(0, spl0sum, "spl0sum for init");
 assert_equal_exact(0, spl1sum, "spl1sum for init");
@@ -370,7 +370,7 @@ assert_near_equal(0, 0.001, spl1sum, "SAMPLE_1_0_TEST: spl1sum was not as expect
 //DEBUGPRINT("spl0sum=%g, spl1sum=%g\n", spl0sum, spl1sum);
 
 //DEBUGPRINT("SAMPLE_0_1_TEST\n");
-// spl0=0 spl1=1 for buffer_length*2 samples
+// spl0=0 spl1=1 for for 100 output samples
 sum_first_pdc_samples(0, 1);
 assert_equal_exact(0, spl0sum, "spl0sum for init");
 assert_equal_exact(0, spl1sum, "spl1sum for init");
@@ -387,7 +387,7 @@ assert_near_equal(100, 0.001, spl1sum, "SAMPLE_0_1_TEST: spl1sum was not as expe
 //DEBUGPRINT("spl0sum=%g, spl1sum=%g\n", spl0sum, spl1sum);
 
 //DEBUGPRINT("SAMPLE_1_1_TEST\n");
-// spl0=1 spl1=1 for buffer_length*2 samples
+// spl0=1 spl1=1 for for 100 output samples
 sum_first_pdc_samples(1, 1);
 assert_equal_exact(0, spl0sum, "spl0sum for init");
 assert_equal_exact(0, spl1sum, "spl1sum for init");
@@ -405,6 +405,7 @@ assert_near_equal(200, 0.001, spl1sum, "SAMPLE_1_1_TEST: spl1sum was not as expe
 
 
 //DEBUGPRINT("SETUP: fft range is [srate/4, srate/2] dry=100 wet=100\n");
+// check no values before first output sample
 slider1 = slider2 = 100;
 slider5 = srate/4;
 slider6 = srate/2;

@@ -1,11 +1,4 @@
-// Helper functions to check for positive infinity, negative infinity, and nan
-function is_pos_inf(x) (x ==  1/0);
-function is_neg_inf(x) (x == -1/0);
-function is_nan(x) (x != x;);
-
 function assert_equal_exact(expected, actual, message) global(failed_asserts, successful_asserts) (
-	is_nan(expected) && is_nan(actual) ? successful_asserts += 1 :
-	(is_pos_inf(expected) && is_pos_inf(actual)) || (is_neg_inf(expected) && is_neg_inf(actual)) ? successful_asserts += 1 :
 	expected !== actual ? (
 		fprintf(3, "\033[0;31mexpected: %g, was: %g. %s\033[0m\n", expected, actual, message);
 		failed_asserts += 1;
@@ -17,8 +10,6 @@ function assert_equal_exact(expected, actual) global() (
 );
 
 function assert_near_equal(expected, tolerance, actual, message) global(failed_asserts, successful_asserts) (
-	is_nan(expected) || is_nan(actual) || is_nan(tolerance) ? successful_asserts += 1 :
-	(is_pos_inf(expected) || is_neg_inf(expected)) && (is_pos_inf(actual) || is_neg_inf(actual)) ? successful_asserts += 1 :
 	abs(expected - actual) > tolerance ? (
 		fprintf(3, "\033[0;31mexpected: %g (±%g), was: %g. %s\033[0m\n", expected, tolerance, actual, message);
 		failed_asserts += 1;
