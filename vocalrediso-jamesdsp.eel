@@ -313,7 +313,7 @@ buffer_index = (buffer_index + 1)%buffer_length;
 //IFTEST ); // function sample_code() (
 
 
-///*IFTEST{* // main test block
+/*IFTEST{* // main test block
 
 // helpers
 function sum_first_pdc_samples(s0val, s1val) (
