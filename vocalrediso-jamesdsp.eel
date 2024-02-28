@@ -54,10 +54,15 @@ prev_fft_size = 0;
 function setup_stft_state(fft_size, first_time) (
 	//////////////////////// Setup block
 	// This is called when playback starts, or when the FFT size is changed
-	memset(fft_buffer, 0, MAX_FFT_SIZE*2);
+	//memset(fft_buffer, 0, MAX_FFT_SIZE*2);
 	memset(output_buffer, 0, buffer_length*2);
 	memset(input_buffer, 0, buffer_length*2);
+	// reset indexes and counters
 	buffer_index = 0;
+	output_index = 0;
+	fft_counter = 0;
+	// force silence for first overlaps where fft not yet run
+	silence = overlap_factor;
 	////////////////////////
 );
 
@@ -88,8 +93,7 @@ function process_stft_segment(fft_buffer, fft_size) local(fft_bin, left_real, le
 		//////////////////////// Main STFT block
 		// The 'meat' of the algorithm, the code in this block will most resemble the code from vocalrediso.ny
 
-		
-		// first, apply	vocal reduction algorithm only in the right bands
+		// first, apply vocal reduction algorithm only in the right bands
 		fft_bin >= low_bin && fft_bin <= high_bin ? (
 			// get constants for this bin
 			strength = strength_buffer[fft_bin];
@@ -250,6 +254,19 @@ loop(fft_size,
 input_buffer[buffer_index*2] = spl0;
 input_buffer[buffer_index*2 + 1] = spl1;
 
+output_index = buffer_index - fft_size;
+output_index < 0 ? output_index += buffer_length;
+silence > 0 ? (
+	spl0 = spl1 = 0;
+	// silence for fft init
+) : (
+	spl0 = output_buffer[output_index*2];
+	spl1 = output_buffer[output_index*2 + 1];
+);
+output_buffer[output_index*2] = 0; // clear the sample we just read
+output_buffer[output_index*2 + 1] = 0;
+
+
 fft_counter += 1;
 fft_counter >= fft_interval ? (
 	fft_counter = 0;
@@ -288,15 +305,8 @@ fft_counter >= fft_interval ? (
 
 		i += 1;
 	);
+	silence > 0 ? silence -= 1;
 );
-
-output_index = buffer_index - fft_size;
-output_index < 0 ? output_index += buffer_length;
-spl0 = output_buffer[output_index*2];
-spl1 = output_buffer[output_index*2 + 1];
-
-output_buffer[output_index*2] = 0; // clear the sample we just read
-output_buffer[output_index*2 + 1] = 0;
 
 buffer_index = (buffer_index + 1)%buffer_length;
 
@@ -319,10 +329,10 @@ function sum_first_pdc_samples(s0val, s1val) (
 	);
 );
 
-//DEBUGPRINT("SETUP: fft range is [0, srate] dry=100 wet=100\n");
+//DEBUGPRINT("SETUP: fft range is [0, srate/2] dry=100 wet=100\n");
 slider1 = slider2 = 100;
 slider5 = 0;
-slider6 = srate;
+slider6 = srate/2;
 slider_code();
 
 //DEBUGPRINT("SAMPLE_0_0_TEST\n");
@@ -394,15 +404,15 @@ assert_near_equal(200, 0.001, spl1sum, "SAMPLE_1_1_TEST: spl1sum was not as expe
 //DEBUGPRINT("spl0sum=%g, spl1sum=%g\n", spl0sum, spl1sum);
 
 
-//DEBUGPRINT("SETUP: fft range is [srate/2, srate] dry=100 wet=100\n");
+//DEBUGPRINT("SETUP: fft range is [srate/4, srate/2] dry=100 wet=100\n");
 slider1 = slider2 = 100;
-slider5 = srate/2;
-slider6 = srate;
+slider5 = srate/4;
+slider6 = srate/2;
 //DEBUGPRINT("PDC_SILENCE_ON_PARTIAL_RANGE_TEST\n");
 slider_code();
 sum_first_pdc_samples(1, 1);
 assert_equal_exact(0, spl0sum, "PDC_SILENCE_ON_PARTIAL_RANGE_TEST failed on spl0");
 assert_equal_exact(0, spl1sum, "PDC_SILENCE_ON_PARTIAL_RANGE_TEST failed on spl1");
 
-//DEBUGPRINT("Testing Completed Without Crashing!\n");
+test_summary();
 //*}IFTEST*/ // main test block

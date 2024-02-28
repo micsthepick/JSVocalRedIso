@@ -5,17 +5,20 @@ sed -r -e 's/^(desc|slider[0-9]+):.*|^@(init|slider|block|serialize|sample)//' \
     -e 's/\*IFNTEST\*|IFNTEST\{\*|\*\}IFNTEST//' \
     vocalrediso-jamesdsp.eel >> vocalrediso.test.eel2
 
-# Run the command, capturing stderr
-{ output=$(./WDL/WDL/eel2/loose_eel ./vocalrediso.test.eel2 2>&1 1>&3-); } 3>&1
+# Initialize a flag to indicate stderr output
+stderr_output=0
 
-# Check if there is any output in stderr
-if [ ! -z "$output" ]; then
-    # Print the stderr output in red
-    echo -e "\e[31m$output\e[0m"
-    # Exit with -1
-    exit -1
-else
-    exit 0
+output=$(./WDL/WDL/eel2/loose_eel ./vocalrediso.test.eel2 2>&1)
+
+echo "$output"
+
+# Get the last line of the output
+last_line=$(echo "$output" | tail -n 1)
+
+# Check if the last line starts with 'FAILURE'
+if echo "$last_line" | grep -q "^FAILURE"; then
+  echo "Failed Test Cases, will return -1!"
+  exit -1
 fi
 
 ##//DEBUGPRINT("HI");
