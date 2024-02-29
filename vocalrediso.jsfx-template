@@ -181,7 +181,6 @@ function process_stft_segment(fft_buffer, fft_size) local(fft_bin, left_real, le
 MAX_FFT_SIZE = 32768;
 fft_size = 8192;
 
-freemem = 0;
 fft_buffer = simple_alloc(MAX_FFT_SIZE*2);
 window_buffer = simple_alloc(MAX_FFT_SIZE);
 
@@ -221,7 +220,7 @@ pdc_bot_ch = 0;
 pdc_top_ch = 2;
 
 /*IFJSFX{
-freembuf(freemem);
+freembuf(_free_memory);
 
 @slider
 }IFJSFX*/
