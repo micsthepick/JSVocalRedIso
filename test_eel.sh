@@ -1,44 +1,32 @@
-cat testing_defines.eel2 > vocalrediso.test.eel2
-sed -r -e 's/^(desc|slider[0-9]+):.*|^@(init|slider|block|serialize|sample)//' \
-    -e 's/\/\/DEBUGPRINT/printf/' \
-    -e 's/\/\/IFTEST|\/\*IFTEST\{\*|\*\}IFTEST\*\///' \
-    -e 's/\*IFNTEST\*|IFNTEST\{\*|\*\}IFNTEST//' \
-    vocalrediso-jamesdsp.eel >> vocalrediso.test.eel2
+# ensure latest testing script is available
+./process_scripts.sh
 
-# Initialize a flag to indicate stderr output
-stderr_output=0
+# add defines to head of test script
+cat testing_defines.eel2 vocalrediso.test > vocalrediso.test.eel2
 
-output=$(./WDL/WDL/eel2/loose_eel ./vocalrediso.test.eel2 2>&1)
+function run_test {
+  local test_script="$1"
+  local test_output
 
-echo "$output"
+  echo "TESTING $1"
 
-# Get the last line of the output
-last_line=$(echo "$output" | tail -n 1)
+  # Ensure latest testing script is available
+  ./process_scripts.sh
 
-# Check if the last line starts with 'FAILURE'
-if echo "$last_line" | grep -q "^FAILURE"; then
-  echo "Failed Test Cases, will return -1!"
-  exit -1
-fi
+  # Add defines to head of test script
+  cat testing_defines.eel2 "$test_script" > "${test_script}.eel2"
 
-##//DEBUGPRINT("HI");
-##//IFTEST code_here();
-##/*IFTEST{*
-##  more_code();
-##*}IFTEST*/
-##/*IFNTEST*/called_when_not_testing();
-##/*IFNTEST{*/
-## also_called_when_not_testing();
-##/*}IFNTEST*/
+  # Run the test and capture output
+  test_output=$(./WDL/WDL/eel2/loose_eel "./${test_script}.eel2" 2>&1)
+  echo "$test_output"
 
-# will transform to
+  # Get the last line of the output and check for failure
+  if echo "$test_output" | tail -n 1 | grep -q "^FAILURE"; then
+    echo "Failed Test Cases, will return -1!"
+    exit -1
+  fi
+}
 
-##printf("HI");
-## code_here();
-##
-##  more_code();
-## 
-##//called_when_not_testing();
-##/*IFNTEST{*/
-## also_called_when_not_testing();
-##/*IFNTEST}*/
+# Run tests for each script
+run_test vocalrediso.test
+run_test vocalredisoBlurry.test

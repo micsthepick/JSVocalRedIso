@@ -25,19 +25,19 @@ slider12:0<-180,180,0.05>Phase2 (Degrees)
 slider13:0<0,10,0.1>Blurring factor
 //IFTEST */ //this section not used by testing code
 
-
+/*IFJSFX{
 in_pin:left input
 in_pin:right input
 out_pin:left output
 out_pin:right output
-
+}IFJSFX*/
 
 
 
 //IFTEST /*
 @init
 //IFTEST */
- /*
+//IFJSFX /*
 slider1=0;
 slider2=0;
 slider3=0;
@@ -51,7 +51,7 @@ slider10=1;
 slider11=1;
 slider12=0;
 slider13=0;
- */
+//IFJSFX */
 
 //IFTEST srate = 24000;
 
@@ -259,11 +259,11 @@ pdc_delay = fft_size;
 pdc_bot_ch = 0;
 pdc_top_ch = 2;
 
-
+/*IFJSFX{
 freembuf(freemem);
 
 @slider
-
+}IFJSFX*/
 //IFTEST function slider_code() (
 // convert low cut and high cut to bins every time a slider is changed
 low_bin = min(slider5, slider6) / srate * fft_size;
@@ -369,18 +369,18 @@ buffer_index = (buffer_index + 1)%buffer_length;
 //IFTEST ); // function sample_code()
 
 
-
+/*IFJSFX{
 @serialize
-
-//IFEEL /*
+}IFJSFX*/
  /*
+//IFJSFX /*
 function file_var(file, val) (
 	printf("FILE_VAR, FILE: %d, VAL: %g\n", file, val)	
 );
- */
+//IFJSFX */
 serial_version = 1.00;
 file_var(0, serial_version);
-//IFEEL */
+ */
 // nothing serialized yet, but keep track of the serial_version
 // for the preset state of the original plugin, serial_version would now be euqal to 0.
 

@@ -362,3 +362,4 @@ MigrationBackup/
 FodyWeavers.xsd
 
 *.test.eel2
+*.test
