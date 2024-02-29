@@ -7,7 +7,9 @@ It can isolate or attenuate the vocals (center panned audio) in a mix, and as su
 ### Reaper
 Reaper supports JSFX natively, just copy vocalrediso.jsfx to `%AppData%\REAPER\Effects` (In a subfolder if preferred)
 
-### VST compatible DAW (Instructions for windows)
+### VST compatible DAW 
+
+#### Instructions for windows
 JSFX can usually be run in a vst through [ReaPlugs by Cocos](https://www.reaper.fm/reaplugs/).  
 Download and install ReaPlugs, and pay attention to where it installs.  
 If you have Reaper installed, ReaPlugs should detect that `%AppData%\REAPER` exists and use that to load JSFX from %AppData%\REAPER\Effects instead of the local copy.
@@ -18,6 +20,12 @@ Otherwise, ReaPlugs will load effects from `...\ReaPlugs\JS` at the install loca
     rootpath=\path\to\custom\folder\JS
 
 where \path\to\custom\folder\JS is the path to the JS folder that contains the ColorThemes, Data, Effects and presets folders that you would like ReaJs to use. (For example I run Equalizer APO and when reaper is installed, the audio service tries to load plugins from %AppData%\REAPER\Effects but is denied because of permissions)
+
+#### Other:
+try this fork of [ysfx](https://github.com/JoepVanlier/ysfx/).
+
+### JamesDSP
+simply load the eel instead of the JSFX. (not eel2)
 
 
 ## Using the effect:
