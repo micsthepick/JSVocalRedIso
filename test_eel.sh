@@ -1,9 +1,6 @@
 # ensure latest testing script is available
 ./process_scripts.sh
 
-# add defines to head of test script
-cat testing_defines.eel2 vocalrediso.test > vocalrediso.test.eel2
-
 function run_test {
   local test_script="$1"
   local test_output
