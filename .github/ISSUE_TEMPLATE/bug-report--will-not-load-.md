@@ -32,7 +32,7 @@ If applicable, add screenshots to help explain your problem.
  - Device: [e.g. Samsung Galaxy S 22 Note Plus]
  - OS: [e.g. Android 13]
  - Host [e.g. RootlessJamesDSP]
-- Play store used [e.g. Google Play Store, F-Droid]
+ - Play store used [e.g. Google Play Store, F-Droid]
  - Plugin Version [e.g. 1.0.0]
 
 **Additional context**

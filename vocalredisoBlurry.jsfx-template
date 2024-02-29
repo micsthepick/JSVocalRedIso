@@ -1,0 +1,522 @@
+// Based on Vocalrediso.ny, a nyquist filter for audacity, currently released under the GNU GPL V3
+// see https://www.gnu.org/licenses/gpl-3.0.en.html, https://www.audacityteam.org/
+// credits to Neil Bickford for his denoiser, https://github.com/Nbickford/REAPERDenoiser,
+// which was used as a starting point for this script
+// which now uses the STFT template code by geraintluff: https://forum.cockos.com/showthread.php?t=225955
+
+///IFTEST* //this section not used by testing code
+desc: vocal removal/isolation
+//tags: processing vocals stereo
+//author: Michael Pannekoek
+
+//slider1:fft_size_index=2<0,7,1{256,512,1024,2048,4096,8192,16384,32768}>FFT size
+slider1:0<-100,100,0.1>dry mix
+slider2:0<-100,100,0.1>C mix (Vocals)
+slider3:0<-5,5,0.001>strength at Low Cut
+slider4:0<-5,5,0.001>strength at High Cut
+slider5:80<0,24000,10>Low Cut (Vocals)
+slider6:24000<0,24000,10>High Cut (Vocals)
+slider7:0<-90,90,0.1>Phase (Degrees)
+slider8:0<-5,5,0.001>Phase width at Low Cut
+slider9:0<-5,5,0.001>Phase width at High Cut
+slider10:1<0,1,0.05>Attenuate if different volume
+slider11:1<0,1,1{No,Yes}>undo input corrections
+slider12:0<-180,180,0.05>Phase2 (Degrees)
+slider13:0<0,10,0.1>Blurring factor
+slider14:0<0,2,1{Max,Min,Avg}>Blurring aggregate
+//IFTEST*/ //this section not used by testing code
+
+/*IFJSFX{
+in_pin:left input
+in_pin:right input
+out_pin:left output
+out_pin:right output
+}IFJSFX*/
+
+
+
+///IFTEST*
+@init
+//IFTEST*/
+///IFJSFX*
+slider1=0;
+slider2=0;
+slider3=0;
+slider4=0;
+slider5=80;
+slider6=24000;
+slider7=0;
+slider8=0;
+slider9=0;
+slider10=1;
+slider11=1;
+slider12=0;
+slider13=0;
+slider14=0;
+//IFJSFX*/
+
+//IFTEST srate = 24000;
+
+_free_memory = 0;
+function simple_alloc(amount)
+local(_free_memory_old)
+global(_free_memory)
+(
+  _free_memory_old = _free_memory;
+  _free_memory += amount;
+  _free_memory_old;
+);
+
+prev_fft_size = 0;
+
+function setup_stft_state(fft_size, first_time) (
+	//////////////////////// Setup block
+	// This is called when playback starts, or when the FFT size is changed
+	memset(output_buffer, 0, buffer_length*2);
+	memset(input_buffer, 0, buffer_length*2);
+	// reset indexes and counters
+	buffer_index = 0;
+	output_index = 0;
+	fft_counter = 0;
+	// force silence for first overlaps where fft not yet run
+	silence = overlap_factor;
+	////////////////////////
+);
+
+function get_weight(strength, phase_width, l_real, l_imag, r_real, r_imag) local(norm_left, norm_right, w1, weight) (
+	// cacluate energy for this bin
+	norm_left = sqrt(sqr(l_real) + sqr(l_imag));
+	norm_right = sqrt(sqr(r_real) + sqr(r_imag));
+
+	// calculate phase difference between left & right, divide by phase_width
+	w1 = (l_real * r_real + l_imag * r_imag) / (norm_left * norm_right * phase_width * 2);
+	weight = ((max(0, min(1, w1+0.5))) ^ strength);
+	// calculate weight: truncate w1 to [0, 1] and apply strength, then take 1 - the result, and multiply
+	// by 1 - the square of the difference between the two norm values divided by the sum of the two, moderated by strength * slider10
+	slider10 > 0 ? weight *= (
+		1 - sqr(norm_left - norm_right)/sqr(norm_left + norm_right)
+	) ^ (slider10 / strength) * 0.5;
+	weight;
+);
+
+setup_stft_state(fft_size, prev_fft_size == 0);
+
+function process_stft_segment(fft_buffer, fft_size) local(fft_bin, left_real, left_imag, right_real, right_imag) (
+	fft_bin = 0; // FFT bin number
+	loop(fft_size/2+1,
+		fft_bin2 = fft_bin ? (fft_size - fft_bin) : 0;
+
+		// Unfold complex spectrum into two real spectra
+		left_real = fft_buffer[2*fft_bin] + fft_buffer[2*fft_bin2];
+		left_imag = fft_buffer[2*fft_bin + 1] - fft_buffer[2*fft_bin2 + 1];
+		right_real = fft_buffer[2*fft_bin + 1] + fft_buffer[2*fft_bin2 + 1];
+		right_imag = -fft_buffer[2*fft_bin] + fft_buffer[2*fft_bin2];
+
+		// input corrections
+		// first, change the phase of L based on phase2:
+		l_real_twisted = left_real*cosine2 + left_imag*sine2;
+		l_imag_twisted = left_imag*cosine2 - left_real*sine2;
+
+		// now mix L&R together based on phase
+		r_real_rotated = right_real*cosine + l_real_twisted*sine;
+		r_imag_rotated = right_imag*cosine + l_imag_twisted*sine;
+		l_real_rotated = l_real_twisted*cosine - right_real*sine;
+		l_imag_rotated = l_imag_twisted*cosine - right_imag*sine;
+
+		//////////////////////// Main STFT block
+		// The 'meat' of the algorithm, the code in this block will most resemble the code from vocalrediso.ny
+
+		weight = 0;
+		// first, apply vocal reduction algorithm only in the right bands
+		fft_bin >= low_bin && fft_bin <= high_bin ? (
+			weight = get_weight(strength_buffer[fft_bin], phase_width_buffer[fft_bin], l_real_rotated, l_imag_rotated, r_real_rotated, r_imag_rotated);
+		);
+
+		// memorize this bin's weight and coeffs
+		blurring_buffer[fft_bin] = weight;
+
+		left_fft_buffer[fft_bin*2]    = l_real_rotated;
+		left_fft_buffer[fft_bin*2+1]  = l_imag_rotated;
+		right_fft_buffer[fft_bin*2]   = r_real_rotated;
+		right_fft_buffer[fft_bin*2+1] = r_imag_rotated;
+
+		fft_bin += 1;
+	);
+	fft_bin = 0; // FFT bin number
+	loop(fft_size/2+1,
+		fft_bin2 = fft_bin ? (fft_size - fft_bin) : 0;
+		l_real_rotated = left_fft_buffer[fft_bin*2];
+		l_imag_rotated = left_fft_buffer[fft_bin*2+1];
+		r_real_rotated = right_fft_buffer[fft_bin*2];
+		r_imag_rotated = right_fft_buffer[fft_bin*2+1];
+		fft_bin >= low_bin && fft_bin <= high_bin ? (
+			// find the c channel, the sum of the two complex numbers
+			c_real = l_real_rotated + r_real_rotated;
+			c_imag = l_imag_rotated + r_imag_rotated;
+
+			// Find the blurred attenuation factor for this coefficient
+			// find out how much to blur by in this 
+			blur_amount = (slider13*log(1+fft_bin))~0;
+			attenuation_factor = 0;
+			slider14 == 1 ? attenuation_factor = 1;
+
+			index = max(0, fft_bin-blur_amount);
+			max+index = min(fft_size/2-1, fft_bin+blur_amount);
+			elems = max+index - index + 1;
+			loop(elems,
+				slider14 == 0 ?
+					attenuation_factor = max(attenuation_factor, blurring_buffer[index])
+				: slider14 == 1 ?
+					attenuation_factor = min(attenuation_factor, blurring_buffer[index])
+				: slider14 == 2 ?
+					attenuation_factor += blurring_buffer[index];
+			);
+
+			weight = attenuation_factor;
+			slider14 == 2 ? weight /= elems;
+
+			// apply weight to c channel
+			c_real *= weight;
+			c_imag *= weight;
+		) :
+		(
+			// let wet signal have 0 for fft coefficients when out of bounds
+			c_real = 0;
+			c_imag = 0;
+		);
+		//////////////////////// END MAIN STFT block
+
+		// apply wet dry mix
+		out_l_real = l_real_rotated * dry_mix + c_real * wet_mix;
+		out_l_imag = l_imag_rotated * dry_mix + c_imag * wet_mix;
+		out_r_real = r_real_rotated * dry_mix + c_real * wet_mix;
+		out_r_imag = r_imag_rotated * dry_mix + c_imag * wet_mix;
+
+		// output corrections
+		slider11 > 0.5 ? (
+			// if requested, undo input corrections
+
+			// unmix by phase
+			l_real_out_twisted = out_l_real*cosine - out_r_real*sine;
+			l_imag_out_twisted = out_l_imag*cosine - out_r_imag*sine;
+			right_real = out_r_real*cosine + out_l_real*sine;
+			right_imag = out_r_imag*cosine + out_l_imag*sine;
+
+			left_real = l_real_out_twisted * cosine2 - l_imag_out_twisted * sine2;
+			left_imag = l_imag_out_twisted * cosine2 + l_real_out_twisted * sine2;
+		) :
+		(
+			// else, just copy the values
+			left_real = out_l_real;
+			left_imag = out_l_imag;
+			right_real = out_r_real;
+			right_imag = out_r_imag;
+		);
+
+		// Re-fold back into complex spectrum
+		fft_buffer[2*fft_bin] = (left_real - right_imag)*0.5;
+		fft_buffer[2*fft_bin + 1] = (left_imag + right_real)*0.5;
+		fft_buffer[2*fft_bin2] = (left_real + right_imag)*0.5;
+		fft_buffer[2*fft_bin2 + 1] = (-left_imag + right_real)*0.5;
+
+		fft_bin += 1;
+	);
+);
+
+MAX_FFT_SIZE = 32768;
+fft_size = 8192;
+
+freemem = 0;
+fft_buffer = simple_alloc(MAX_FFT_SIZE*2);
+window_buffer = simple_alloc(MAX_FFT_SIZE);
+
+strength_buffer = simple_alloc(MAX_FFT_SIZE);
+phase_width_buffer = simple_alloc(MAX_FFT_SIZE);
+blurring_buffer = simple_alloc(MAX_FFT_SIZE);
+left_fft_buffer = simple_alloc(MAX_FFT_SIZE*2+2);
+right_fft_buffer = simple_alloc(MAX_FFT_SIZE*2+2);
+
+buffer_length = srate;
+buffer_index = 0;
+input_buffer = simple_alloc(buffer_length*2);
+output_buffer =  simple_alloc(buffer_length*2);
+
+function window(r) (
+	// When squared, the Hann window adds up perfectly for overlap >= 4, so it's suitable for perfect reconstruction
+	//(0.5 - 0.5*cos(r*2*$pi))/sqrt(0.375);
+	// the MLT sine window also appears to add up correctly, with sigma = sqrt(2).
+	sin(r*$pi)*sqrt(2);
+);
+
+overlap_factor = 4;
+fft_interval = fft_size/overlap_factor;
+fft_scaling_factor = 1/overlap_factor/fft_size;
+
+fft_size != prev_fft_size ? (
+	setup_stft_state(fft_size, prev_fft_size == 0);
+	prev_fft_size = fft_size;
+	// Fill window buffer
+	i = 0;
+	loop(fft_size,
+		r = i/fft_size;
+		window_buffer[i] = window(r);
+		i += 1;
+	);
+);
+
+pdc_delay = fft_size;
+pdc_bot_ch = 0;
+pdc_top_ch = 2;
+
+/*IFJSFX{
+freembuf(freemem);
+
+@slider
+}IFJSFX*/
+//IFTEST function slider_code() (
+// convert low cut and high cut to bins every time a slider is changed
+low_bin = min(slider5, slider6) / srate * fft_size;
+high_bin = max(slider6, slider5) / srate * fft_size;
+// convert to radians
+rotation = slider7*$pi/180;
+// convert percentage to raw scale factor
+dry_mix = slider1/100;
+wet_mix = slider2/100;
+low_strength = slider3;
+high_strength = slider4;
+phase_width_low = slider8;
+phase_width_high = slider9;
+cosine = cos(rotation);
+sine = sin(rotation);
+cosine2 = cos(slider12*$pi/180);
+sine2 = sin(slider12*$pi/180);
+// fill strength_buffer and phase_width_buffer
+band_index = 0;
+loop(fft_size/2+1,
+	band_index >= low_bin && band_index <= high_bin ?
+	(
+		// only set values for the appropriate frequency range
+		frac = (band_index - low_bin)/(high_bin - low_bin + 1);
+		// fraction of progress through range [low_bin, high_bin)
+		strength = low_strength* (1 - frac) + high_strength * frac;
+		strength_buffer[band_index] = exp(strength);
+		// precaculate strength (actual value should be positive, so it makes
+		// sense to take the power of ten, but only after the
+		// linear mapping over the spectrum is done.
+		// precalculate phase width
+		phase_width = phase_width_low * (1 - frac) + phase_width_high * frac;
+		phase_width_buffer[band_index] = exp(phase_width);
+	);
+
+	band_index += 1;
+	// next index
+);
+//IFTEST ); // slider_code() (
+
+///IFTEST*
+@sample
+//IFTEST*/
+//IFTEST function sample_code() (
+input_buffer[buffer_index*2] = spl0;
+input_buffer[buffer_index*2 + 1] = spl1;
+
+output_index = buffer_index - fft_size;
+output_index < 0 ? output_index += buffer_length;
+silence > 0 ? (
+	spl0 = spl1 = 0;
+	// silence for fft init
+) : (
+	spl0 = output_buffer[output_index*2];
+	spl1 = output_buffer[output_index*2 + 1];
+);
+output_buffer[output_index*2] = 0; // clear the sample we just read
+output_buffer[output_index*2 + 1] = 0;
+
+fft_counter += 1;
+fft_counter >= fft_interval ? (
+	fft_counter = 0;
+
+	// Copy input to buffer
+	bi = buffer_index - fft_size + 1;
+	i = 0;
+	loop(fft_size,
+		i2 = bi + i;
+		i2 < 0 ? i2 += buffer_length;
+
+		fft_buffer[2*i] = input_buffer[2*i2]*window_buffer[i];
+		fft_buffer[2*i + 1] = input_buffer[2*i2 + 1]*window_buffer[i];
+
+		i += 1;
+	);
+
+	// Process buffer
+	fft(fft_buffer, fft_size);
+	fft_permute(fft_buffer, fft_size);
+
+	process_stft_segment(fft_buffer, fft_size);
+
+	fft_ipermute(fft_buffer, fft_size);
+	ifft(fft_buffer, fft_size);
+
+	// Add to output
+	bi = buffer_index - fft_size + 1;
+	i = 0;
+	loop(fft_size,
+		i2 = bi + i;
+		(i2 < 0) ? i2 += buffer_length;
+
+		output_buffer[2*i2] += fft_buffer[2*i]*fft_scaling_factor*window_buffer[i];
+		output_buffer[2*i2 + 1] += fft_buffer[2*i + 1]*fft_scaling_factor*window_buffer[i];
+
+		i += 1;
+	);
+	silence > 0 ? silence -= 1;
+);
+
+buffer_index = (buffer_index + 1)%buffer_length;
+
+//IFTEST ); // function sample_code()
+
+
+/*IFJSFX{
+@serialize
+}IFJSFX*/
+//IFTEST function file_var(file, val) (printf("FILE_VAR, FILE: %d, VAL: %g\n", file, val));
+///IFEEL*
+serial_version = 1.00;
+file_var(0, serial_version);
+//IFEEL*/
+// nothing serialized yet, but keep track of the serial_version
+// for the preset state of the original plugin, serial_version would now be euqal to 0.
+
+/*IFTEST{ // main test block
+
+// helpers
+function sum_first_pdc_samples(s0val, s1val) (
+	setup_stft_state(fft_size, 1);
+	spl0sum = 0;
+	spl1sum = 0;
+	loop(pdc_delay,
+		spl0=s0val;
+		spl1=s1val;
+		sample_code();
+		spl0sum += abs(spl0);
+		spl1sum += abs(spl1);
+	);
+);
+
+printf("SETUP: fft range is [0, srate/2] dry=100 wet=100 attenuate_diff_vol=1\n");
+slider1 = slider2 = 100;
+slider5 = 0;
+slider6 = srate/2;
+slider10 = 1;
+slider_code();
+printf("SETUP: got low_bin=%g, high_bin=%g\n", low_bin, high_bin);
+
+printf("get_weight_ALL_ZERO\n");
+assert_equal_exact(0, get_weight(1, 1, 0, 0, 0, 0));
+
+printf("get_weight_PERPENDICULAR\n");
+assert_equal_exact(0.25, get_weight(1, 1, 0, 1, 1, 0));
+
+printf("get_weight_EQUIVALENT\n");
+assert_equal_exact(0.5, get_weight(1, 1, 1, 0, 1, 0));
+
+printf("get_weight_INVERSE\n");
+assert_equal_exact(0, get_weight(1, 1, 1, 0, -1, 0));
+
+printf("get_weight_ONE_ONLY\n");
+assert_equal_exact(0, get_weight(1, 1, 1, 0, 0, 0));
+
+printf("get_weight_HALF\n");
+assert_equal_exact(0.5, get_weight(1, 1, 0.5, 0, 0.5, 0));
+
+printf("get_weight_STRANGE\n");
+assert_near_equal(0.5, 0.0001, get_weight(1, 1, -33.28894848631978, -662.24573314730117, -33.28894848631978, -662.24573314730117), "STRANGE01");
+assert_near_equal(0.5, 0.0001, get_weight(1, 1, 452.28715419177155, 53.67874245364300, 452.28715419177155, 53.67874245364300), "STRANGE02");
+assert_near_equal(0.5, 0.0001, get_weight(1, 1, 267.79446776740104, 17.14616043377475, 267.79446776740104, 17.14616043377475), "STRANGE03");
+assert_near_equal(0.5, 0.0001, get_weight(1, 1, -32.55549374859478, 261.41171292127513, -32.55549374859478, 261.41171292127513), "STRANGE04");
+assert_near_equal(0.5, 0.0001, get_weight(1, 1, -2.75689966923304, -217.67592724424455, -2.75689966923304, -217.67592724424455), "STRANGE05");
+
+printf("SAMPLE_0_0_TEST\n");
+// spl0=0 spl1=0 for 100 output samples
+sum_first_pdc_samples(0, 0);
+assert_equal_exact(0, spl0sum, "spl0sum for init");
+assert_equal_exact(0, spl1sum, "spl1sum for init");
+
+loop(100,
+	spl0=0;
+	spl1=0;
+	sample_code();
+	spl0sum += abs(spl0);
+	spl1sum += abs(spl1);
+);
+assert_near_equal(0, 0.001, spl0sum, "SAMPLE_0_0_TEST: spl0sum was not as expected");
+assert_near_equal(0, 0.001, spl1sum, "SAMPLE_0_0_TEST: spl1sum was not as expected");
+printf("spl0sum=%g, spl1sum=%g\n", spl0sum, spl1sum);
+
+printf("SAMPLE_1_0_TEST\n");
+// spl0=1 spl1=0 for for 100 output samples
+sum_first_pdc_samples(1, 0);
+assert_equal_exact(0, spl0sum, "spl0sum for init");
+assert_equal_exact(0, spl1sum, "spl1sum for init");
+
+loop(100,
+	spl0=1;
+	spl1=0;
+	sample_code();
+	spl0sum += abs(spl0);
+	spl1sum += abs(spl1);
+);
+assert_near_equal(100, 0.001, spl0sum, "SAMPLE_1_0_TEST: spl0sum was not as expected");
+assert_near_equal(0, 0.001, spl1sum, "SAMPLE_1_0_TEST: spl1sum was not as expected");
+printf("spl0sum=%g, spl1sum=%g\n", spl0sum, spl1sum);
+
+printf("SAMPLE_0_1_TEST\n");
+// spl0=0 spl1=1 for for 100 output samples
+sum_first_pdc_samples(0, 1);
+assert_equal_exact(0, spl0sum, "spl0sum for init");
+assert_equal_exact(0, spl1sum, "spl1sum for init");
+
+loop(100,
+	spl0=0;
+	spl1=1;
+	sample_code();
+	spl0sum += abs(spl0);
+	spl1sum += abs(spl1);
+);
+assert_near_equal(0, 0.001, spl0sum, "SAMPLE_0_1_TEST: spl0sum was not as expected");
+assert_near_equal(100, 0.001, spl1sum, "SAMPLE_0_1_TEST: spl1sum was not as expected");
+printf("spl0sum=%g, spl1sum=%g\n", spl0sum, spl1sum);
+
+printf("SAMPLE_1_1_TEST\n");
+// spl0=1 spl1=1 for for 100 output samples
+sum_first_pdc_samples(1, 1);
+assert_equal_exact(0, spl0sum, "spl0sum for init");
+assert_equal_exact(0, spl1sum, "spl1sum for init");
+
+loop(100,
+	spl0=1;
+	spl1=1;
+	sample_code();
+	spl0sum += abs(spl0);
+	spl1sum += abs(spl1);
+);
+assert_near_equal(200, 0.001, spl0sum, "SAMPLE_1_1_TEST: spl0sum was not as expected");
+assert_near_equal(200, 0.001, spl1sum, "SAMPLE_1_1_TEST: spl1sum was not as expected");
+printf("spl0sum=%g, spl1sum=%g\n", spl0sum, spl1sum);
+
+
+printf("SETUP: fft range is [srate/4, srate/2] dry=100 wet=100\n");
+// check no values before first output sample
+slider1 = slider2 = 100;
+slider5 = srate/4;
+slider6 = srate/2;
+printf("PDC_SILENCE_ON_PARTIAL_RANGE_TEST\n");
+slider_code();
+sum_first_pdc_samples(1, 1);
+assert_equal_exact(0, spl0sum, "PDC_SILENCE_ON_PARTIAL_RANGE_TEST failed on spl0");
+assert_equal_exact(0, spl1sum, "PDC_SILENCE_ON_PARTIAL_RANGE_TEST failed on spl1");
+
+test_summary();
+}IFTEST*/ // main test block
