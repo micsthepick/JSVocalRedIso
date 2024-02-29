@@ -4,7 +4,7 @@
 // which was used as a starting point for this script
 // which now uses the STFT template code by geraintluff: https://forum.cockos.com/showthread.php?t=225955
 
-//IFTEST /* //this section not used by testing code
+///IFTEST* //this section not used by testing code
 desc: vocal removal/isolation
 //tags: processing vocals stereo
 //author: Michael Pannekoek
@@ -23,7 +23,8 @@ slider10:1<0,1,0.05>Attenuate if different volume
 slider11:1<0,1,1{No,Yes}>undo input corrections
 slider12:0<-180,180,0.05>Phase2 (Degrees)
 slider13:0<0,10,0.1>Blurring factor
-//IFTEST */ //this section not used by testing code
+slider14:0<0,2,1{Max,Min,Avg}>Blurring aggregate
+//IFTEST*/ //this section not used by testing code
 
 /*IFJSFX{
 in_pin:left input
@@ -34,10 +35,10 @@ out_pin:right output
 
 
 
-//IFTEST /*
+///IFTEST*
 @init
-//IFTEST */
-//IFJSFX /*
+//IFTEST*/
+///IFJSFX*
 slider1=0;
 slider2=0;
 slider3=0;
@@ -51,7 +52,8 @@ slider10=1;
 slider11=1;
 slider12=0;
 slider13=0;
-//IFJSFX */
+slider14=0;
+//IFJSFX*/
 
 //IFTEST srate = 24000;
 
@@ -156,15 +158,22 @@ function process_stft_segment(fft_buffer, fft_size) local(fft_bin, left_real, le
 			// find out how much to blur by in this 
 			blur_amount = (slider13*log(1+fft_bin))~0;
 			attenuation_factor = 0;
+			slider14 == 1 ? attenuation_factor = 1;
 
 			index = max(0, fft_bin-blur_amount);
 			max+index = min(fft_size/2-1, fft_bin+blur_amount);
 			elems = max+index - index + 1;
 			loop(elems,
-				attenuation_factor += blurring_buffer[index];
+				slider14 == 0 ?
+					attenuation_factor = max(attenuation_factor, blurring_buffer[index])
+				: slider14 == 1 ?
+					attenuation_factor = min(attenuation_factor, blurring_buffer[index])
+				: slider14 == 2 ?
+					attenuation_factor += blurring_buffer[index];
 			);
 
-			weight = attenuation_factor / elems;
+			weight = attenuation_factor;
+			slider14 == 2 ? weight /= elems;
 
 			// apply weight to c channel
 			c_real *= weight;
@@ -304,9 +313,9 @@ loop(fft_size/2+1,
 );
 //IFTEST ); // slider_code() (
 
-//IFTEST /*
+///IFTEST*
 @sample
-//IFTEST */
+//IFTEST*/
 //IFTEST function sample_code() (
 input_buffer[buffer_index*2] = spl0;
 input_buffer[buffer_index*2 + 1] = spl1;
@@ -372,15 +381,11 @@ buffer_index = (buffer_index + 1)%buffer_length;
 /*IFJSFX{
 @serialize
 }IFJSFX*/
- /*
-//IFJSFX /*
-function file_var(file, val) (
-	printf("FILE_VAR, FILE: %d, VAL: %g\n", file, val)	
-);
-//IFJSFX */
+//IFTEST function file_var(file, val) (printf("FILE_VAR, FILE: %d, VAL: %g\n", file, val));
+/*
 serial_version = 1.00;
 file_var(0, serial_version);
- */
+*/
 // nothing serialized yet, but keep track of the serial_version
 // for the preset state of the original plugin, serial_version would now be euqal to 0.
 

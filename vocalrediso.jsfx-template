@@ -4,7 +4,7 @@
 // which was used as a starting point for this script
 // which now uses the STFT template code by geraintluff: https://forum.cockos.com/showthread.php?t=225955
 
-//IFTEST /* //this section not used by testing code
+///IFTEST* //this section not used by testing code
 desc: vocal removal/isolation
 //tags: processing vocals stereo
 //author: Michael Pannekoek
@@ -22,7 +22,7 @@ slider9:0<-5,5,0.001>Phase width at High Cut
 slider10:1<0,1,0.05>Attenuate if different volume
 slider11:1<0,1,1{No,Yes}>undo input corrections
 slider12:0<-180,180,0.05>Phase2 (Degrees)
-//IFTEST */ //this section not used by testing code
+//IFTEST*/ //this section not used by testing code
 
 /*IFJSFX{
 in_pin:left input
@@ -33,10 +33,10 @@ out_pin:right output
 
 
 
-//IFTEST /*
+///IFTEST*
 @init
-//IFTEST */
-//IFJSFX /*
+//IFTEST*/
+///IFJSFX*
 slider1=0;
 slider2=0;
 slider3=0;
@@ -49,7 +49,7 @@ slider9=0;
 slider10=1;
 slider11=1;
 slider12=0;
-//IFJSFX */
+//IFJSFX*/
 
 //IFTEST srate = 24000;
 
@@ -265,9 +265,9 @@ loop(fft_size/2+1,
 );
 //IFTEST ); // slider_code() (
 
-//IFTEST /*
+///IFTEST*
 @sample
-//IFTEST */
+//IFTEST*/
 //IFTEST function sample_code() (
 input_buffer[buffer_index*2] = spl0;
 input_buffer[buffer_index*2 + 1] = spl1;
@@ -333,15 +333,11 @@ buffer_index = (buffer_index + 1)%buffer_length;
 /*IFJSFX{
 @serialize
 }IFJSFX*/
-//IFEEL /*
-//IFJSFX /*
-function file_var(file, val) (
-	printf("FILE_VAR, FILE: %d, VAL: %g\n", file, val)	
-);
-//IFJSFX */
+//IFTEST function file_var(file, val) (printf("FILE_VAR, FILE: %d, VAL: %g\n", file, val));
+///IFEEL*
 serial_version = 1.00;
 file_var(0, serial_version);
-//IFEEL */
+//IFEEL*/
 // nothing serialized yet, but keep track of the serial_version
 // for the preset state of the original plugin, serial_version would now be euqal to 0.
 
